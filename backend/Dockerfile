@@ -27,10 +27,14 @@ RUN apk add --no-cache ca-certificates tzdata wget \
 
 WORKDIR /app
 COPY --from=build /out/api /app/api
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 
-# Only used when STORAGE_DRIVER=local. Created here with the right ownership so
-# the unprivileged user can write to it; production uses S3 and leaves it empty.
-RUN mkdir -p /app/data/uploads && chown -R app:app /app/data
+# The data directory holds the generated JWT secret and, when STORAGE_DRIVER=local,
+# the KYC uploads. Created with the right ownership so the unprivileged user can
+# write to it.
+RUN chmod +x /app/docker-entrypoint.sh \
+    && mkdir -p /app/data/uploads \
+    && chown -R app:app /app/data
 
 # Running unprivileged limits the blast radius of a container compromise.
 USER app
@@ -40,4 +44,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
     CMD wget --quiet --tries=1 --spider http://localhost:8080/healthz || exit 1
 
-ENTRYPOINT ["/app/api"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

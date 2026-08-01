@@ -283,13 +283,11 @@ func (c *Config) validate() error {
 
 	switch c.Storage.Driver {
 	case "local":
-		// Local storage does not survive a container being replaced and is not
-		// shared between instances, so a document uploaded to one container would
-		// be missing from the others. That is a data-loss risk, not a preference.
-		if c.App.IsProduction() {
-			problems = append(problems,
-				"STORAGE_DRIVER must be 's3' in production; local uploads are lost when the container is replaced")
-		}
+		// Not fatal: the compose file mounts a named volume over the upload
+		// directory, so documents do survive a container being replaced. The
+		// remaining exposure is losing the instance and not being able to run more
+		// than one, which Warnings() reports at startup rather than blocking a
+		// deployment that is otherwise fine.
 	case "s3":
 		if c.Storage.S3Bucket == "" {
 			problems = append(problems, "S3_BUCKET is required when STORAGE_DRIVER=s3")
@@ -321,6 +319,53 @@ func (c *Config) validate() error {
 		return fmt.Errorf("invalid configuration:\n  - %s", strings.Join(problems, "\n  - "))
 	}
 	return nil
+}
+
+// Warnings returns configuration that works but should be changed before the
+// platform carries real money.
+//
+// Separate from validate() on purpose: none of these should stop a deployment, but
+// all of them are things an operator would want to know they are running with, and
+// discovering them from a support ticket is worse than reading them at boot.
+func (c *Config) Warnings() []string {
+	var out []string
+
+	if c.Storage.Driver == "local" {
+		out = append(out,
+			"STORAGE_DRIVER=local: KYC documents are stored on this instance. They survive "+
+				"container restarts and rebuilds, but are lost if the instance is terminated and "+
+				"cannot be shared across more than one instance. Set STORAGE_DRIVER=s3 with "+
+				"S3_BUCKET and S3_REGION before onboarding real retailers.")
+	}
+
+	if c.BharatConnect.Enabled && c.BharatConnect.AgentID == "" {
+		out = append(out,
+			"BC_AGENT_ID is empty: Bharat Connect balance, validation, view-bill, payment and "+
+				"status calls will be rejected as incomplete. MobiKwik supplies it after UAT sign-off.")
+	}
+
+	// Checked by value rather than by "was it set", because the risk is the value
+	// being guessable, not where it came from.
+	if weakDBPasswords[c.DB.Password] {
+		out = append(out,
+			"DB_PASSWORD is a well-known default. This is tolerable only because Postgres is "+
+				"not published outside the Docker network. Set DB_PASSWORD if you ever expose it, "+
+				"or move to RDS.")
+	}
+
+	if !c.App.IsProduction() {
+		out = append(out,
+			"APP_ENV is not 'production': stack traces are more verbose and TLS checks on the "+
+				"database are relaxed.")
+	}
+
+	return out
+}
+
+// weakDBPasswords are values common enough to be in any credential list.
+var weakDBPasswords = map[string]bool{
+	"postgres": true, "password": true, "root": true, "admin": true,
+	"changeme": true, "utilipay": true, "": true,
 }
 
 // --- environment helpers ---

@@ -6,10 +6,19 @@
 #   api      Go API at utilipayhub.com/api/
 #   postgres database, reachable only inside the compose network
 #
-# Bring up:      docker compose --env-file .env up -d --build
+# Every value below has a working default, so a bare clone runs with no
+# configuration:
+#
+#   git clone <repo> && cd <repo>
+#   docker compose up -d --build
+#
+# To override anything, create a .env file beside this one. It is gitignored, so
+# production credentials live there and never reach the repository. Values in .env
+# win over the defaults here.
+#
 # Follow logs:   docker compose logs -f api
-# Stop:          docker compose down          (keeps the database volume)
-# Wipe:          docker compose down -v       (destroys the database)
+# Stop:          docker compose down          (keeps the database)
+# Wipe:          docker compose down -v       (destroys the database and uploads)
 
 name: utilipayhub
 
@@ -18,22 +27,25 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_USER: ${DB_USER:-utilipay}
+      # A fixed default is acceptable here only because Postgres is never
+      # published: it is reachable from the compose network alone. Set DB_PASSWORD
+      # in .env if you ever expose the port or move to a managed database.
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-utilipay-internal-only-not-exposed}
       POSTGRES_DB: ${DB_NAME:-utilipay}
-      # Deterministic collation keeps ORDER BY identical across hosts, so a
-      # report generated on one machine matches another.
+      # Deterministic collation keeps ORDER BY identical across hosts, so a report
+      # generated on one machine matches another.
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    # Deliberately not published. The database is reachable only from the compose
-    # network; exposing 5432 on an EC2 instance is how databases get found.
+    # Deliberately not published. Exposing 5432 on an EC2 instance is how
+    # databases get found.
     expose:
       - "5432"
     healthcheck:
       # Checks the specific database rather than just the open port, because the
       # API depends on this and connecting too early fails the migration.
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-utilipay}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-utilipay} -d ${DB_NAME:-utilipay}"]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -54,15 +66,14 @@ services:
       PORT: 8080
       LOG_LEVEL: ${LOG_LEVEL:-info}
 
-      # Same-origin in this topology, so CORS never comes into play. Kept accurate
-      # anyway: if the dashboard is ever moved to its own subdomain this is the one
-      # value that has to change.
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://utilipayhub.com,https://www.utilipayhub.com}
+      # Same-origin in this topology, so CORS never applies. Kept accurate anyway:
+      # if the dashboard moves to its own subdomain this is the value to change.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://utilipayhub.com,https://www.utilipayhub.com,http://localhost}
 
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_USER: ${DB_USER:-utilipay}
+      DB_PASSWORD: ${DB_PASSWORD:-utilipay-internal-only-not-exposed}
       DB_NAME: ${DB_NAME:-utilipay}
       # Traffic to the database never leaves the Docker bridge, so TLS between
       # them adds nothing. Set to require if you move to RDS.
@@ -70,50 +81,76 @@ services:
       DB_TIMEZONE: ${DB_TIMEZONE:-Asia/Kolkata}
       DB_AUTO_MIGRATE: ${DB_AUTO_MIGRATE:-true}
 
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      # Deliberately empty. The container entrypoint generates a random secret on
+      # first boot and keeps it on the data volume.
+      #
+      # A signing key committed to the repository would let anyone who can read the
+      # source forge an admin session against a live server, so this is the one
+      # value that is never shipped. Set it in .env only if you need the same key
+      # across several instances.
+      JWT_SECRET: ${JWT_SECRET:-}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-24h}
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-720h}
 
       # --- KYC document storage ---
-      # s3 in any real deployment: the container filesystem is discarded on every
-      # release, which would lose every uploaded identity document.
-      STORAGE_DRIVER: ${STORAGE_DRIVER:-s3}
+      #
+      # Defaults to the data volume so a clone runs without an AWS account.
+      # Documents survive container restarts and rebuilds, but not the instance
+      # being terminated, and cannot be shared across instances. Switch to s3
+      # before onboarding real retailers; the API warns about this at every boot.
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      UPLOAD_DIR: /app/data/uploads
       S3_BUCKET: ${S3_BUCKET:-}
       S3_REGION: ${S3_REGION:-ap-south-1}
       S3_PREFIX: ${S3_PREFIX:-kyc}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
-      # Leave both empty on EC2 and attach an instance role instead; the SDK picks
-      # it up automatically and there are no long-lived keys to leak.
+      # Leave empty on EC2 and attach an instance role; the SDK finds it and there
+      # are no long-lived keys to leak.
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-5242880}
 
       # --- bootstrap logins ---
+      # Created only if absent, so a password changed in the app is never reset by
+      # a redeploy. Change these in .env before the first boot if you want
+      # different ones; afterwards, change the password in the app.
       SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-UtiliPay Hub Admin}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-adminutilihub@gmail.com}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-utilihub@admin}
       SEED_RETAILER_EMAIL: ${SEED_RETAILER_EMAIL:-retailer.demo@gmail.com}
       SEED_RETAILER_PASSWORD: ${SEED_RETAILER_PASSWORD:-demo@retailer}
 
+      # ---------------------------------------------------------------------
+      # Provider credentials — UAT / sandbox
+      #
+      # These are the pre-licensing test credentials, committed so the stack runs
+      # on a clone. They reach sandbox environments only and move no real money.
+      #
+      # PRODUCTION KEYS MUST NOT BE ADDED HERE. When MobiKwik and Excisoft issue
+      # them after sign-off, put them in .env on the server, which is gitignored.
+      # ---------------------------------------------------------------------
       AEPS_ENABLED: ${AEPS_ENABLED:-true}
       AEPS_BASE_URL: ${AEPS_BASE_URL:-https://apidev.excisofttech.com}
-      AEPS_API_KEY: ${AEPS_API_KEY}
+      AEPS_API_KEY: ${AEPS_API_KEY:-kGxc8E68fiU1HYwlImyMGouxlK0MUsqH}
       AEPS_CALLBACK_URL: ${AEPS_CALLBACK_URL:-https://utilipayhub.com/api/v1/webhooks/aeps/onboard}
       AEPS_TIMEOUT: ${AEPS_TIMEOUT:-45s}
 
       BC_ENABLED: ${BC_ENABLED:-true}
       BC_BASE_URL: ${BC_BASE_URL:-https://alpha3.mobikwik.com}
-      BC_CLIENT_ID: ${BC_CLIENT_ID}
-      BC_CLIENT_SECRET: ${BC_CLIENT_SECRET}
-      BC_PUBLIC_KEY_BASE64: ${BC_PUBLIC_KEY_BASE64}
+      BC_CLIENT_ID: ${BC_CLIENT_ID:-RCH_bs3Tixn22Yi_jrEYIi6ycA}
+      BC_CLIENT_SECRET: ${BC_CLIENT_SECRET:-Lhu9DcU7FyI6MoPSF1SQp4jwAKCKa0mCK7H4iIQZaek}
+      BC_PUBLIC_KEY_BASE64: ${BC_PUBLIC_KEY_BASE64:-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlHpOvQI7LvtOmK5jRfqvoUbJtlVVIbez31E0G7tNrCpOtwsV08yc1GYBqG4zSicvsMHUiCkvdeB4Eo0pXEcV5Gw7swMXUT/LkAQVm0L8JYpUVkZmAORVDpHCVX1kJP9mAaRVtkt6BItZQXcUBO7ykNJOY2hItZfVzyapXn7WfB+BV7Bbu+MiJKGJM3VYKHsokAFi36g3dSlVG2NCKD+q4wzhCZGygkYlAkmcBarbizYbATu2kkqWz1oCqClwIxwRUNh5chVu/vbyvgTcGYfA0IehcJePcX6+NVtAFsuifvdscnG93inJXpeJnbUEqcGMzdvsVwSit7eDZKoUW8WuOwIDAQAB}
       BC_KEY_VERSION: ${BC_KEY_VERSION:-1.0}
-      BC_AGENT_ID: ${BC_AGENT_ID:-}
+      # Sample value from the specification. MobiKwik issues the real one after UAT
+      # sign-off; until then transactional calls are rejected as incomplete.
+      BC_AGENT_ID: ${BC_AGENT_ID:-MK01MK01INB523643654}
       BC_TENANT_ID: ${BC_TENANT_ID:-}
       BC_AES_MODE: ${BC_AES_MODE:-gcm}
       BC_RSA_PADDING: ${BC_RSA_PADDING:-pkcs1v15}
-      # 12, confirmed by a successful live call. The specification's prose says 16
-      # and is wrong. Do not change without the provider saying so.
+      # 12, confirmed by a successful live Balance Check against UAT. The
+      # specification's prose says 16 and is wrong; its own captured samples agree
+      # with 12. Do not change without the provider saying so.
       BC_GCM_IV_SIZE: ${BC_GCM_IV_SIZE:-12}
       BC_TIMEOUT: ${BC_TIMEOUT:-45s}
       BC_TOKEN_SAFETY_WINDOW: ${BC_TOKEN_SAFETY_WINDOW:-30m}
@@ -124,9 +161,11 @@ services:
     expose:
       - "8080"
     volumes:
-      # Only used when STORAGE_DRIVER=local, so a development stack keeps its
-      # uploads across a container restart.
-      - api-uploads:/app/data/uploads
+      # Holds the generated JWT secret and, with STORAGE_DRIVER=local, the KYC
+      # uploads. Mounted at /app/data rather than the uploads subdirectory so the
+      # secret persists too; regenerating it on every deploy would sign every user
+      # out.
+      - api-data:/app/data
     networks:
       - internal
 
@@ -135,8 +174,8 @@ services:
       context: ./utility-frontend
       dockerfile: Dockerfile
       args:
-        # Both are compiled into the bundle, so they are build arguments rather
-        # than environment variables. Changing either needs a rebuild.
+        # Compiled into the bundle, so these are build arguments rather than
+        # environment variables. Changing either needs `docker compose build app`.
         APP_BASE_PATH: ${APP_BASE_PATH:-/app/}
         VITE_API_URL: ${VITE_API_URL:-}
     restart: unless-stopped
@@ -192,7 +231,7 @@ services:
       - certbot-conf:/etc/letsencrypt
       - certbot-www:/var/www/certbot
     # Twelve-hourly because Let's Encrypt recommends attempting renewal well
-    # before expiry; a no-op run is cheap.
+    # before expiry, and a no-op run costs nothing.
     entrypoint: >
       /bin/sh -c "trap exit TERM;
       while :; do certbot renew --webroot --webroot-path=/var/www/certbot --quiet;
@@ -202,7 +241,7 @@ services:
 
 volumes:
   postgres-data:
-  api-uploads:
+  api-data:
   certbot-conf:
   certbot-www:
 
