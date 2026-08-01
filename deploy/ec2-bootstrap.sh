@@ -133,8 +133,25 @@ if docker info >/dev/null 2>&1; then
 fi
 
 # --- build and start ---
-log "Building and starting the stack. First run takes 5-10 minutes."
-$DOCKER compose up -d --build
+# Build each image in sequence. Building the Go API and both Node frontends in
+# parallel can exceed the small root volume on entry-level EC2 instances even
+# though the final runtime images are compact. Removing BuildKit's temporary
+# cache after each image keeps the completed image and frees compiler/dependency
+# layers before the next build begins.
+log "Building API image"
+$DOCKER compose build api
+$DOCKER builder prune -af
+
+log "Building dashboard image"
+$DOCKER compose build app
+$DOCKER builder prune -af
+
+log "Building landing-page image"
+$DOCKER compose build landing
+$DOCKER builder prune -af
+
+log "Pulling runtime images and starting the stack"
+$DOCKER compose up -d --no-build
 
 log "Waiting for the API to report ready"
 READY=0
