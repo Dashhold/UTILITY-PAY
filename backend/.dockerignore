@@ -1,0 +1,29 @@
+# Real configuration never enters the image; compose injects the environment.
+.env
+.env.local
+.env.*.local
+
+# Build output
+bin/
+out/
+api
+api.exe
+
+# Uploaded documents must never be baked into an image.
+data/
+
+# Go tooling
+*.test
+*.out
+coverage.html
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+*.md
+.vscode
+.idea
+
+# Local verification scripts.
+verify*.ps1

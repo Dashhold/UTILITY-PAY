@@ -1,0 +1,77 @@
+# ---------------------------------------------------------------------------
+# Secrets
+#
+# Deployment configuration holds provider credentials, the JWT secret and the
+# database password. Only the .env.example files belong in version control, and
+# those must contain placeholders rather than real values: git history is
+# permanent, so a committed secret has to be rotated with the provider rather
+# than removed.
+# ---------------------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Provider documentation containing credentials in the clear.
+#
+# The MobiKwik PDF embeds a clientId/clientSecret pair in its sample request and
+# is a binary that cannot be redacted. The same specification is committed in
+# readable form as bharat_connect/recharge&billpayment_api_doc.md and
+# bharat_connect/pdf_poppler.txt, both with credentials removed, so nothing is
+# lost by keeping the original local.
+bharat_connect/*.pdf
+
+# Private keys and certificates, wherever they land.
+*.pem
+*.key
+*.p12
+*.pfx
+!**/testdata/**/*.pem
+
+# ---------------------------------------------------------------------------
+# Dependencies and build output
+# ---------------------------------------------------------------------------
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Go
+bin/
+api
+api.exe
+*.test
+*.out
+coverage.html
+
+# ---------------------------------------------------------------------------
+# Runtime data
+# ---------------------------------------------------------------------------
+# Retailer KYC uploads: identity documents.
+backend/data/
+data/uploads/
+
+# Database dumps.
+backups/
+
+# Certificates and ACME state live in Docker volumes; if ever bind mounted they
+# must not be committed.
+deploy/certbot/
+
+# Local build helper binary.
+.pdfextract/*.exe
+.pdfextract/err.txt
+
+# Local verification scripts.
+verify*.ps1
+build.log
+
+# ---------------------------------------------------------------------------
+# Editors and OS
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+.idea/

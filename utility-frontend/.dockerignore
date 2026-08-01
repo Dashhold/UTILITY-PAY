@@ -1,0 +1,18 @@
+node_modules
+dist
+build
+npm-debug.log*
+
+# Real configuration never enters the image; VITE_* values are passed as build
+# arguments so they are explicit and visible in the compose file.
+.env
+.env.local
+.env.*.local
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+*.md
+.vscode
+.idea

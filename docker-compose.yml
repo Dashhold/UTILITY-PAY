@@ -1,0 +1,211 @@
+# UtiliPay Hub — full stack.
+#
+#   nginx    edge proxy, the only published port
+#   landing  marketing site at utilipayhub.com/
+#   app      dashboard bundle at utilipayhub.com/app/
+#   api      Go API at utilipayhub.com/api/
+#   postgres database, reachable only inside the compose network
+#
+# Bring up:      docker compose --env-file .env up -d --build
+# Follow logs:   docker compose logs -f api
+# Stop:          docker compose down          (keeps the database volume)
+# Wipe:          docker compose down -v       (destroys the database)
+
+name: utilipayhub
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_DB: ${DB_NAME:-utilipay}
+      # Deterministic collation keeps ORDER BY identical across hosts, so a
+      # report generated on one machine matches another.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # Deliberately not published. The database is reachable only from the compose
+    # network; exposing 5432 on an EC2 instance is how databases get found.
+    expose:
+      - "5432"
+    healthcheck:
+      # Checks the specific database rather than just the open port, because the
+      # API depends on this and connecting too early fails the migration.
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-utilipay}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - internal
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      PORT: 8080
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # Same-origin in this topology, so CORS never comes into play. Kept accurate
+      # anyway: if the dashboard is ever moved to its own subdomain this is the one
+      # value that has to change.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://utilipayhub.com,https://www.utilipayhub.com}
+
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-utilipay}
+      # Traffic to the database never leaves the Docker bridge, so TLS between
+      # them adds nothing. Set to require if you move to RDS.
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      DB_TIMEZONE: ${DB_TIMEZONE:-Asia/Kolkata}
+      DB_AUTO_MIGRATE: ${DB_AUTO_MIGRATE:-true}
+
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-24h}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-720h}
+
+      # --- KYC document storage ---
+      # s3 in any real deployment: the container filesystem is discarded on every
+      # release, which would lose every uploaded identity document.
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-s3}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-ap-south-1}
+      S3_PREFIX: ${S3_PREFIX:-kyc}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+      # Leave both empty on EC2 and attach an instance role instead; the SDK picks
+      # it up automatically and there are no long-lived keys to leak.
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-5242880}
+
+      # --- bootstrap logins ---
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-UtiliPay Hub Admin}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-adminutilihub@gmail.com}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-utilihub@admin}
+      SEED_RETAILER_EMAIL: ${SEED_RETAILER_EMAIL:-retailer.demo@gmail.com}
+      SEED_RETAILER_PASSWORD: ${SEED_RETAILER_PASSWORD:-demo@retailer}
+
+      AEPS_ENABLED: ${AEPS_ENABLED:-true}
+      AEPS_BASE_URL: ${AEPS_BASE_URL:-https://apidev.excisofttech.com}
+      AEPS_API_KEY: ${AEPS_API_KEY}
+      AEPS_CALLBACK_URL: ${AEPS_CALLBACK_URL:-https://utilipayhub.com/api/v1/webhooks/aeps/onboard}
+      AEPS_TIMEOUT: ${AEPS_TIMEOUT:-45s}
+
+      BC_ENABLED: ${BC_ENABLED:-true}
+      BC_BASE_URL: ${BC_BASE_URL:-https://alpha3.mobikwik.com}
+      BC_CLIENT_ID: ${BC_CLIENT_ID}
+      BC_CLIENT_SECRET: ${BC_CLIENT_SECRET}
+      BC_PUBLIC_KEY_BASE64: ${BC_PUBLIC_KEY_BASE64}
+      BC_KEY_VERSION: ${BC_KEY_VERSION:-1.0}
+      BC_AGENT_ID: ${BC_AGENT_ID:-}
+      BC_TENANT_ID: ${BC_TENANT_ID:-}
+      BC_AES_MODE: ${BC_AES_MODE:-gcm}
+      BC_RSA_PADDING: ${BC_RSA_PADDING:-pkcs1v15}
+      # 12, confirmed by a successful live call. The specification's prose says 16
+      # and is wrong. Do not change without the provider saying so.
+      BC_GCM_IV_SIZE: ${BC_GCM_IV_SIZE:-12}
+      BC_TIMEOUT: ${BC_TIMEOUT:-45s}
+      BC_TOKEN_SAFETY_WINDOW: ${BC_TOKEN_SAFETY_WINDOW:-30m}
+
+      RECON_ENABLED: ${RECON_ENABLED:-true}
+      RECON_INTERVAL: ${RECON_INTERVAL:-60s}
+      RECON_MAX_ATTEMPTS: ${RECON_MAX_ATTEMPTS:-8}
+    expose:
+      - "8080"
+    volumes:
+      # Only used when STORAGE_DRIVER=local, so a development stack keeps its
+      # uploads across a container restart.
+      - api-uploads:/app/data/uploads
+    networks:
+      - internal
+
+  app:
+    build:
+      context: ./utility-frontend
+      dockerfile: Dockerfile
+      args:
+        # Both are compiled into the bundle, so they are build arguments rather
+        # than environment variables. Changing either needs a rebuild.
+        APP_BASE_PATH: ${APP_BASE_PATH:-/app/}
+        VITE_API_URL: ${VITE_API_URL:-}
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - internal
+
+  landing:
+    build:
+      context: ./landingpage-frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    expose:
+      - "3000"
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - app
+      - landing
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./deploy/nginx/snippets:/etc/nginx/snippets:ro
+      - certbot-conf:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - internal
+
+  # Renewal only. The first certificate is issued by deploy/init-letsencrypt.sh,
+  # which needs nginx already serving the ACME challenge path.
+  certbot:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    # Twelve-hourly because Let's Encrypt recommends attempting renewal well
+    # before expiry; a no-op run is cheap.
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+      while :; do certbot renew --webroot --webroot-path=/var/www/certbot --quiet;
+      sleep 12h & wait $${!}; done"
+    networks:
+      - internal
+
+volumes:
+  postgres-data:
+  api-uploads:
+  certbot-conf:
+  certbot-www:
+
+networks:
+  internal:
+    driver: bridge

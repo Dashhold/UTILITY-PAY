@@ -1,0 +1,20 @@
+node_modules
+.next
+out
+dist
+npm-debug.log*
+
+# Real configuration never enters the image; the environment is injected at run
+# time by compose.
+.env
+.env.local
+.env.*.local
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md
+*.md
+.vscode
+.idea

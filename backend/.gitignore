@@ -1,0 +1,27 @@
+# Real configuration holds provider credentials and the JWT secret.
+# Only .env.example belongs in version control.
+.env
+.env.local
+.env.*.local
+
+# Build output
+/bin/
+/out/
+api
+api.exe
+
+# Retailer KYC uploads: identity documents, never version-controlled.
+/data/
+
+# Local verification scripts.
+verify*.ps1
+
+# Go tooling
+*.test
+*.out
+coverage.html
+
+# Editor
+.idea/
+.vscode/
+*.swp
