@@ -53,12 +53,12 @@ export function AdminDashboard() {
     stats,
     pendingFundRequests,
     reconciliation,
-    recentTransactions: transactions,
-    recentFundRequests: fundRequests,
-    recentRetailers: retailers,
-    serviceAnalytics: analytics,
-    announcements,
   } = data
+  const transactions = Array.isArray(data.recentTransactions) ? data.recentTransactions : []
+  const fundRequests = Array.isArray(data.recentFundRequests) ? data.recentFundRequests : []
+  const retailers = Array.isArray(data.recentRetailers) ? data.recentRetailers : []
+  const analytics = Array.isArray(data.serviceAnalytics) ? data.serviceAnalytics : []
+  const announcements = Array.isArray(data.announcements) ? data.announcements : []
 
   // Service mix for the pie chart, derived from the server's per-service report so
   // the chart and the table below cannot disagree.

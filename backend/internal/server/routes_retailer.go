@@ -174,8 +174,8 @@ func registerRetailerCore(r *gin.RouterGroup, deps Dependencies) {
 		httpx.OK(c, gin.H{
 			"stats":              stats,
 			"profile":            profile,
-			"recentTransactions": recent.Items,
-			"announcements":      announcements,
+			"recentTransactions": nonNilSlice(recent.Items),
+			"announcements":      nonNilSlice(announcements),
 			"capabilities": gin.H{
 				"aeps":          deps.AEPS.Capabilities(),
 				"bharatConnect": deps.BharatConnect.Capabilities(),

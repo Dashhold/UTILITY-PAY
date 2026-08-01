@@ -71,7 +71,8 @@ export function RetailerDashboard() {
   }, [])
 
   const firstName = user?.name.split(" ")[0] ?? "there"
-  const recentTransactions = data?.recentTransactions ?? []
+  const recentTransactions = Array.isArray(data?.recentTransactions) ? data.recentTransactions : []
+  const announcements = Array.isArray(data?.announcements) ? data.announcements : []
 
   // Hooks must run before every loading/error return. An empty list during the
   // initial request gives the same eventual result without changing hook order.
@@ -108,7 +109,6 @@ export function RetailerDashboard() {
   }
 
   const { stats, profile, capabilities } = data
-  const announcements = data.announcements ?? []
 
   const kycPending = profile.kycStatus !== "verified"
   const aepsPending = profile.aepsOnboardStatus !== "completed"

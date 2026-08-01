@@ -33,6 +33,16 @@ func contextWithTimeout(c *gin.Context, d time.Duration) (context.Context, conte
 	return context.WithTimeout(c.Request.Context(), d)
 }
 
+// nonNilSlice ensures JSON represents an empty collection as [] rather than
+// null. Dashboard consumers always render these values as lists, and a null
+// collection would otherwise force every client to special-case Go's nil slice.
+func nonNilSlice[T any](items []T) []T {
+	if items == nil {
+		return []T{}
+	}
+	return items
+}
+
 // streamDocument writes a KYC document to the response.
 //
 // Shared by the retailer and admin handlers so both get the same headers. The
