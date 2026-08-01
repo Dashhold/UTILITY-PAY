@@ -42,6 +42,6 @@ USER app
 EXPOSE 8080
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
-    CMD wget --quiet --tries=1 --spider http://localhost:8080/healthz || exit 1
+    CMD wget --quiet --tries=1 -O /dev/null http://localhost:8080/healthz || exit 1
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
