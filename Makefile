@@ -2,7 +2,7 @@
 #
 # Everything here wraps docker compose. Run `make help` for the list.
 
-COMPOSE := docker compose --env-file .env
+COMPOSE := docker compose
 
 .DEFAULT_GOAL := help
 .PHONY: help up down build rebuild logs logs-api ps restart shell-api shell-db \
@@ -13,7 +13,6 @@ help: ## Show this help
 	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 up: ## Build and start the whole stack
-	@test -f .env || { echo "error: .env not found. cp .env.example .env"; exit 1; }
 	$(COMPOSE) up -d --build
 	@echo ""
 	@echo "Landing page:  http://localhost/"

@@ -36,21 +36,35 @@ log "Detected $DISTRO_ID"
 
 # --- swap ---
 #
-# `next build` and `vite build` each peak above 1 GB. On a t3.micro they are killed
-# by the OOM reaper partway through, which Docker reports as a bare "exit code 137"
-# rather than anything mentioning memory. 4 GB of swap makes the builds complete on
-# the smallest instance types.
+# `next build` and `vite build` each peak above 1 GB. A modest swap file keeps
+# builds reliable on small EC2 instances, but must never consume the disk space
+# needed for Docker images. Reserve 3 GB for images/data and cap the swap at 1 GB
+# on normal small hosts (2 GB only on hosts with less than 1 GB RAM).
 TOTAL_MEM_MB=$(awk '/MemTotal/ {printf "%d", $2/1024}' /proc/meminfo)
-log "Memory: ${TOTAL_MEM_MB} MB"
+AVAILABLE_DISK_MB=$(df -Pm / | awk 'NR==2 {print $4}')
+log "Memory: ${TOTAL_MEM_MB} MB; free root disk: ${AVAILABLE_DISK_MB} MB"
 
 if [ "$TOTAL_MEM_MB" -lt 3800 ] && [ ! -f /swapfile ]; then
-    log "Adding 4 GB of swap so the frontend builds are not OOM-killed"
-    sudo fallocate -l 4G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096 status=none
-    sudo chmod 600 /swapfile
-    sudo mkswap /swapfile >/dev/null
-    sudo swapon /swapfile
-    grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
-    log "Swap active: $(free -h | awk '/Swap/ {print $2}')"
+    SWAP_MB=1024
+    if [ "$TOTAL_MEM_MB" -lt 1024 ]; then
+        SWAP_MB=2048
+    fi
+    MAX_SWAP_MB=$((AVAILABLE_DISK_MB - 3072))
+    if [ "$MAX_SWAP_MB" -lt 512 ]; then
+        warn "Not creating swap: reserve disk space for Docker images (only ${AVAILABLE_DISK_MB} MB free)."
+    else
+        if [ "$SWAP_MB" -gt "$MAX_SWAP_MB" ]; then
+            SWAP_MB=$MAX_SWAP_MB
+        fi
+        log "Adding ${SWAP_MB} MB swap so frontend builds are not OOM-killed"
+        sudo fallocate -l "${SWAP_MB}M" /swapfile 2>/dev/null || \
+            sudo dd if=/dev/zero of=/swapfile bs=1M count="$SWAP_MB" status=none
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile >/dev/null
+        sudo swapon /swapfile
+        grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+        log "Swap active: $(free -h | awk '/Swap/ {print $2}')"
+    fi
 elif [ -f /swapfile ]; then
     log "Swap file already present"
 else
@@ -140,8 +154,36 @@ else
     warn "Check the logs:  $DOCKER compose logs api"
 fi
 
-PUBLIC_IP=$(curl -fsS --max-time 5 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "")
+# Retrieve the public address through IMDSv2 when it is enabled, falling back to
+# IMDSv1 for older Amazon Linux images. This is informational only; certificate
+# issuance below has its own public HTTP challenge check.
+IMDS_TOKEN=$(curl -fsS --max-time 3 -X PUT \
+    -H "X-aws-ec2-metadata-token-ttl-seconds: 60" \
+    http://169.254.169.254/latest/api/token 2>/dev/null || true)
+if [ -n "$IMDS_TOKEN" ]; then
+    PUBLIC_IP=$(curl -fsS --max-time 5 \
+        -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
+        http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || true)
+else
+    PUBLIC_IP=$(curl -fsS --max-time 5 \
+        http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || true)
+fi
 [ -n "$PUBLIC_IP" ] || PUBLIC_IP="<instance-ip>"
+
+# A new clone is usable on HTTP immediately. If DNS is already present, complete
+# the TLS cutover now rather than requiring an operator to edit nginx afterward.
+# init-letsencrypt.sh performs a public challenge preflight, so a stale DNS record
+# cannot accidentally obtain a certificate for this host.
+PRIMARY_DOMAIN="${CERTBOT_PRIMARY_DOMAIN:-utilipayhub.com}"
+if [ "$READY" -eq 1 ] && getent ahostsv4 "$PRIMARY_DOMAIN" >/dev/null 2>&1; then
+    log "DNS found for $PRIMARY_DOMAIN; attempting automatic TLS provisioning"
+    if ! DOCKER="$DOCKER" CERTBOT_EMAIL="${CERTBOT_EMAIL:-adminutilihub@gmail.com}" \
+        CERTBOT_DOMAINS="${CERTBOT_DOMAINS:-utilipayhub.com}" ./deploy/init-letsencrypt.sh; then
+        warn "TLS was not activated. HTTP remains available; check DNS and port 80, then re-run ./deploy/init-letsencrypt.sh."
+    fi
+else
+    warn "DNS for $PRIMARY_DOMAIN is not available yet; serving HTTP until TLS can be issued."
+fi
 
 echo ""
 echo "  Landing page:  http://${PUBLIC_IP}/"
@@ -163,4 +205,4 @@ warn "       S3_BUCKET=your-bucket"
 warn "       S3_REGION=ap-south-1"
 warn "     and run: $DOCKER compose up -d"
 warn "     Until then uploads live on this instance and are lost if it is replaced."
-warn "  3. Point utilipayhub.com here, then run ./deploy/init-letsencrypt.sh for TLS."
+warn "  3. If DNS was not ready during bootstrap, run ./deploy/init-letsencrypt.sh."

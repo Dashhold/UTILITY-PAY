@@ -277,8 +277,12 @@ func (c *Config) validate() error {
 		}
 	}
 
-	if c.App.IsProduction() && c.DB.SSLMode == "disable" {
-		problems = append(problems, "DB_SSLMODE must not be 'disable' in production")
+	// Docker Compose keeps its Postgres service on a private bridge network.
+	// TLS is mandatory for every other production database endpoint, but requiring
+	// it for that internal hostname would make the supplied self-contained stack
+	// unable to start because the official Postgres image does not enable TLS.
+	if c.App.IsProduction() && c.DB.SSLMode == "disable" && !isInternalComposePostgres(c.DB.Host) {
+		problems = append(problems, "DB_SSLMODE must not be 'disable' in production outside the internal Compose postgres service")
 	}
 
 	switch c.Storage.Driver {
@@ -360,6 +364,14 @@ func (c *Config) Warnings() []string {
 	}
 
 	return out
+}
+
+// isInternalComposePostgres reports whether the DB host is the unexposed
+// service name used by the supplied single-host Compose stack. This is deliberately
+// an exact allow-list; an IP address, localhost, RDS hostname, or external service
+// must use PostgreSQL TLS in production.
+func isInternalComposePostgres(host string) bool {
+	return strings.EqualFold(strings.TrimSpace(host), "postgres")
 }
 
 // weakDBPasswords are values common enough to be in any credential list.
