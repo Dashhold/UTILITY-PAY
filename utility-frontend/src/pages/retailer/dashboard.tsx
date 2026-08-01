@@ -107,7 +107,8 @@ export function RetailerDashboard() {
     )
   }
 
-  const { stats, profile, announcements, capabilities } = data
+  const { stats, profile, capabilities } = data
+  const announcements = data.announcements ?? []
 
   const kycPending = profile.kycStatus !== "verified"
   const aepsPending = profile.aepsOnboardStatus !== "completed"

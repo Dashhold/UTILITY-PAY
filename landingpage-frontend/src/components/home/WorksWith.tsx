@@ -8,7 +8,7 @@ const partners = [
   { name: "BHIM", src: "/bhim-bharat-interface-for-money-seeklogo.png" },
   { name: "Google Pay", src: "/Google_Pay-Logo.wine.png" },
   { name: "PhonePe", src: "/PhonePe-Logo.wine.png" },
-  { name: "Paytm", src: "/paytm-log.png" },
+  { name: "Paytm", src: undefined },
   { name: "Amazon Pay", src: "/vecteezy_amazon-logo-png-amazon-icon-transparent-png_19766240.png" },
   { name: "Visa", src: "/visa-seeklogo.png" },
   { name: "Mastercard", src: "/mastercard-26161.png" },
@@ -42,14 +42,18 @@ export function WorksWith() {
               key={`${partner.name}-${i}`}
               className="flex h-24 w-40 shrink-0 items-center justify-center rounded-2xl border border-gray-100 bg-white px-6 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-soft-lg dark:border-white/10 dark:bg-white/[0.04]"
             >
-              <div className="relative h-12 w-full">
-                <Image
-                  src={partner.src}
-                  alt={`${partner.name} logo`}
-                  fill
-                  sizes="160px"
-                  className="object-contain"
-                />
+              <div className="relative flex h-12 w-full items-center justify-center">
+                {partner.src ? (
+                  <Image
+                    src={partner.src}
+                    alt={`${partner.name} logo`}
+                    fill
+                    sizes="160px"
+                    className="object-contain"
+                  />
+                ) : (
+                  <span className="text-lg font-bold tracking-tight text-[#002e6e]">{partner.name}</span>
+                )}
               </div>
             </div>
           ))}
