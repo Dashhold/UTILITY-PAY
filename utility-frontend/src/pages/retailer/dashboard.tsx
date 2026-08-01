@@ -71,6 +71,17 @@ export function RetailerDashboard() {
   }, [])
 
   const firstName = user?.name.split(" ")[0] ?? "there"
+  const recentTransactions = data?.recentTransactions ?? []
+
+  // Hooks must run before every loading/error return. An empty list during the
+  // initial request gives the same eventual result without changing hook order.
+  const serviceMix = React.useMemo(() => {
+    const totals = new Map<string, number>()
+    for (const txn of recentTransactions) {
+      totals.set(txn.category, (totals.get(txn.category) ?? 0) + toNumberOrZero(txn.amount))
+    }
+    return [...totals.entries()].map(([name, value]) => ({ name, value }))
+  }, [recentTransactions])
 
   if (loading) return <DashboardSkeleton />
 
@@ -96,20 +107,10 @@ export function RetailerDashboard() {
     )
   }
 
-  const { stats, profile, recentTransactions, announcements, capabilities } = data
+  const { stats, profile, announcements, capabilities } = data
 
   const kycPending = profile.kycStatus !== "verified"
   const aepsPending = profile.aepsOnboardStatus !== "completed"
-
-  // Service mix is derived from the transactions actually returned, so an empty
-  // account shows an empty chart rather than invented slices.
-  const serviceMix = React.useMemo(() => {
-    const totals = new Map<string, number>()
-    for (const txn of recentTransactions) {
-      totals.set(txn.category, (totals.get(txn.category) ?? 0) + toNumberOrZero(txn.amount))
-    }
-    return [...totals.entries()].map(([name, value]) => ({ name, value }))
-  }, [recentTransactions])
 
   const quickActions = [
     { label: "AEPS", icon: Fingerprint, href: "/retailer/services/aeps", enabled: capabilities.aeps.onboard },
