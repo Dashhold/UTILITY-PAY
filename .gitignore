@@ -40,8 +40,8 @@ build/
 
 # Go
 bin/
-api
-api.exe
+/api
+/api.exe
 *.test
 *.out
 coverage.html

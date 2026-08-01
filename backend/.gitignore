@@ -7,8 +7,8 @@
 # Build output
 /bin/
 /out/
-api
-api.exe
+/api
+/api.exe
 
 # Retailer KYC uploads: identity documents, never version-controlled.
 /data/

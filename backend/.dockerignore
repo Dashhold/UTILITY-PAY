@@ -6,8 +6,8 @@
 # Build output
 bin/
 out/
-api
-api.exe
+/api
+/api.exe
 
 # Uploaded documents must never be baked into an image.
 data/
