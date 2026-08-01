@@ -28,16 +28,18 @@ export const BRAND_COLORS = {
  * separately by NPCI — drop them into /public/brand using exactly these
  * names and every screen picks them up automatically.
  * See /public/brand/README.md for the manifest.
+ * 
+ * Note: Paths are prefixed with /app/ because the dashboard is served from /app/.
  */
 export const BRAND_ASSETS = {
   /** Full horizontal lockup: B mnemonic + "Bharat Connect" wordmark. */
-  logoLockup: "/brand/bharat-connect-logo.png",
+  logoLockup: "/app/brand/bharat-connect-logo.png",
   /** Standalone B mnemonic. Falls back to a crop of the lockup if absent. */
-  mnemonic: "/brand/bharat-connect-mnemonic.png",
+  mnemonic: "/app/brand/bharat-connect-mnemonic.png",
   /** B-Assured trust mark, shown on payment success + receipts. */
-  assured: "/brand/b-assured.png",
+  assured: "/app/brand/b-assured.png",
   /** Official sonic branding clip played on the payment success screen. */
-  successAudio: "/brand/bharat-connect-success.mp3",
+  successAudio: "/app/brand/bharat-connect-success.mp3",
 } as const
 
 /**

@@ -53,8 +53,8 @@ export function BharatConnectHome() {
           style={{ background: `linear-gradient(90deg, ${BRAND_COLORS.blue} 0%, ${BRAND_COLORS.orange} 100%)` }}
         />
         {/* NPCI mandate: Bharat Connect logo on the top right. */}
-        <div className="absolute right-5 top-5 hidden sm:block">
-          <BharatConnectBrandBar />
+        <div className="absolute right-3 top-3 z-10 sm:right-5 sm:top-5">
+          <BharatConnectBrandBar size="sm" />
         </div>
 
         <div className="flex flex-col gap-6 px-5 py-7 sm:px-8 sm:py-10 lg:flex-row lg:items-center lg:gap-10">

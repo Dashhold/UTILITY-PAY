@@ -151,9 +151,9 @@ export function BharatConnectBrandBar({
   className,
 }: BharatConnectBrandBarProps) {
   return (
-    <div className={cn("flex shrink-0 flex-col items-end gap-1", className)}>
+    <div className={cn("flex shrink-0 flex-col items-end gap-1.5", className)}>
       {label && (
-        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+        <span className="whitespace-nowrap text-[11px] font-medium uppercase tracking-wider text-gray-500">
           {label}
         </span>
       )}
