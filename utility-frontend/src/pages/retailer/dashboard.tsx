@@ -110,22 +110,26 @@ export function RetailerDashboard() {
 
   const { stats, profile, capabilities } = data
 
+  // Safely access nested capability fields
+  const aepsCapabilities = capabilities?.aeps ?? {}
+  const bharatConnectCapabilities = capabilities?.bharatConnect ?? {}
+
   const kycPending = profile.kycStatus !== "verified"
   const aepsPending = profile.aepsOnboardStatus !== "completed"
 
   const quickActions = [
-    { label: "AEPS", icon: Fingerprint, href: "/retailer/services/aeps", enabled: capabilities.aeps.onboard },
+    { label: "AEPS", icon: Fingerprint, href: "/retailer/services/aeps", enabled: aepsCapabilities.onboard ?? false },
     {
       label: "Bill Payments",
       icon: Receipt,
       href: "/retailer/bharat-connect",
-      enabled: capabilities.bharatConnect.payment,
+      enabled: bharatConnectCapabilities.payment ?? false,
     },
     {
       label: "Recharge",
       icon: Smartphone,
       href: "/retailer/bharat-connect/categories",
-      enabled: capabilities.bharatConnect.payment,
+      enabled: bharatConnectCapabilities.payment ?? false,
     },
     { label: kycPending ? "Complete KYC" : "View KYC", icon: ShieldCheck, href: "/retailer/kyc", enabled: true },
   ]

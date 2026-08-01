@@ -60,6 +60,11 @@ export function AdminDashboard() {
   const analytics = Array.isArray(data.serviceAnalytics) ? data.serviceAnalytics : []
   const announcements = Array.isArray(data.announcements) ? data.announcements : []
 
+  // Safely access nested systemStatus fields
+  const systemStatus = data.systemStatus ?? {}
+  const aepsStatus = systemStatus.aeps ?? {}
+  const bharatConnectStatus = systemStatus.bharatConnect ?? {}
+
   // Service mix for the pie chart, derived from the server's per-service report so
   // the chart and the table below cannot disagree.
   const serviceMix = analytics
@@ -448,13 +453,13 @@ export function AdminDashboard() {
             rather than being shown green, which would misrepresent readiness. */}
         <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {[
-            { name: "AEPS Onboarding", live: data.systemStatus.aeps.onboard },
-            { name: "AEPS Transactions", live: data.systemStatus.aeps.cashWithdrawal },
-            { name: "Bharat Connect Auth", live: data.systemStatus.bharatConnect.token },
-            { name: "Bill Fetch", live: data.systemStatus.bharatConnect.viewBill },
-            { name: "Bill Payment", live: data.systemStatus.bharatConnect.payment },
-            { name: "Status Check", live: data.systemStatus.bharatConnect.status },
-            { name: "Recharge Plans", live: data.systemStatus.bharatConnect.plans },
+            { name: "AEPS Onboarding", live: aepsStatus.onboard ?? false },
+            { name: "AEPS Transactions", live: aepsStatus.cashWithdrawal ?? false },
+            { name: "Bharat Connect Auth", live: bharatConnectStatus.token ?? false },
+            { name: "Bill Fetch", live: bharatConnectStatus.viewBill ?? false },
+            { name: "Bill Payment", live: bharatConnectStatus.payment ?? false },
+            { name: "Status Check", live: bharatConnectStatus.status ?? false },
+            { name: "Recharge Plans", live: bharatConnectStatus.plans ?? false },
             { name: "Recon Engine", live: true },
           ].map((s) => (
             <div key={s.name} className="flex flex-col gap-1.5 rounded-md border border-gray-100 px-3 py-2.5">
