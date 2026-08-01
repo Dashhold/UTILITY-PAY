@@ -398,6 +398,17 @@ export interface ListParams {
 
 export const api = {
   auth: {
+    register: (body: {
+      name: string
+      email: string
+      mobile: string
+      shopName: string
+      city: string
+      state: string
+      password: string
+    }) =>
+      request<{ message: string }>("/api/v1/auth/register", { method: "POST", body, skipAuth: true }),
+
     login: (email: string, password: string) =>
       request<Session>("/api/v1/auth/login", { method: "POST", body: { email, password }, skipAuth: true }),
 

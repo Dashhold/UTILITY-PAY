@@ -53,7 +53,7 @@ export function RegisterPage() {
     setSubmitting(true)
     try {
       // Call the registration API endpoint
-      await api.post("/auth/register", {
+      await api.auth.register({
         name: values.name,
         email: values.email,
         mobile: values.mobile,
