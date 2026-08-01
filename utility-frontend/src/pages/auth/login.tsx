@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useNavigate, useLocation } from "react-router-dom"
+import { useNavigate, useLocation, Link } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -160,6 +160,15 @@ export function LoginPage() {
               Sign in
             </Button>
           </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{" "}
+              <Link to="/register" className="font-medium text-brand-600 hover:text-brand-700">
+                Create account
+              </Link>
+            </p>
+          </div>
 
           {/*
             Demo credentials are shown only outside production so the seeded

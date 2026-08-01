@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { adminNav, retailerNav } from "@/config/nav"
 import { LoginPage } from "@/pages/auth/login"
+import { RegisterPage } from "@/pages/auth/register"
 import { NotFound } from "@/pages/errors/not-found"
 
 import { AdminDashboard } from "@/pages/admin/dashboard"
@@ -68,6 +69,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
 
             <Route element={<ProtectedRoute allowedRole="admin" />}>
               <Route path="/admin" element={<DashboardLayout navItems={adminNav} brandLabel="Admin Panel" />}>
