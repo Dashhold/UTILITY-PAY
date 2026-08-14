@@ -576,7 +576,7 @@ func upsertByName[T any](db *gorm.DB, rows []T, nameOf func(T) string) error {
 	for i := range rows {
 		row := rows[i]
 		var count int64
-		if err := db.Model(new(T)).Where("name = ?", nameOf(row)).Count(&count).Error; err != nil {
+		if err := db.Model(new(T)).Where("LOWER(name) = LOWER(?)", nameOf(row)).Count(&count).Error; err != nil {
 			return err
 		}
 		if count > 0 {
