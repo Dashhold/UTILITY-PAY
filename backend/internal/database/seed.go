@@ -291,6 +291,15 @@ func seedUserTypes(db *gorm.DB, _ *slog.Logger) error {
 }
 
 func seedServiceCategories(db *gorm.DB, _ *slog.Logger) error {
+	// Skip if categories already exist
+	var count int64
+	if err := db.Model(&models.ServiceCategory{}).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	
 	rows := []models.ServiceCategory{
 		{Name: "AEPS", Icon: "fingerprint", Description: "Aadhaar Enabled Payment System", Status: models.StatusEnabled, SortOrder: 1},
 		{Name: "Bharat Connect", Icon: "receipt", Description: "Utility bill payments over Bharat Connect (BBPS)", Status: models.StatusEnabled, SortOrder: 2},
