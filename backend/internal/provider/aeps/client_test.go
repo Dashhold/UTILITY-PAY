@@ -22,9 +22,13 @@ type stubDoer struct {
 	err          error
 	captured     *http.Request
 	capturedBody []byte
+	// calls counts dispatches, so a test can assert that local validation ran
+	// before anything reached the network.
+	calls int
 }
 
 func (s *stubDoer) Do(req *http.Request) (*http.Response, error) {
+	s.calls++
 	s.captured = req
 	if req.Body != nil {
 		s.capturedBody, _ = io.ReadAll(req.Body)
@@ -47,6 +51,9 @@ func testClient(t *testing.T, doer provider.Doer) *Client {
 		CallbackURL: "https://utilipayhub.com/aeps/callback",
 		Timeout:     10 * time.Second,
 		Enabled:     true,
+		BankPipe:    "bank3",
+		Device:      "Mantra",
+		AccessMode:  "SITE",
 	}
 	return New(cfg, provider.NoopSink{}).WithTransport(doer)
 }
@@ -272,29 +279,62 @@ func TestOnboard_DisabledIntegration(t *testing.T) {
 func TestUndocumentedOperationsReportNotImplemented(t *testing.T) {
 	c := testClient(t, &stubDoer{status: 200, body: "{}"})
 
-	// These must fail loudly rather than return a fabricated success, because a
-	// silent fake would look like a completed cash withdrawal.
-	if _, err := c.Transact(context.Background(), TxnRequest{Operation: "cash_withdrawal"}); !errors.Is(err, ErrNotImplemented) {
-		t.Errorf("Transact error = %v, want ErrNotImplemented", err)
+	// Aadhaar Pay has no specification sheet and the provider exposes no
+	// transaction status endpoint. Both must fail loudly rather than return a
+	// fabricated success, because a silent fake would look like completed
+	// movement of money.
+	if _, err := c.Transact(context.Background(), TxnRequest{Operation: "aadhaar_pay"}); !errors.Is(err, ErrNotImplemented) {
+		t.Errorf("Transact(aadhaar_pay) error = %v, want ErrNotImplemented", err)
 	}
 	if _, err := c.CheckStatus(context.Background(), "ref"); !errors.Is(err, ErrNotImplemented) {
 		t.Errorf("CheckStatus error = %v, want ErrNotImplemented", err)
 	}
 
 	caps := c.Capabilities()
-	if !caps.Onboard {
-		t.Error("Onboard capability should be true: it is the documented endpoint")
-	}
 	for name, enabled := range map[string]bool{
-		"CashWithdrawal": caps.CashWithdrawal,
-		"BalanceEnquiry": caps.BalanceEnquiry,
-		"MiniStatement":  caps.MiniStatement,
-		"AadhaarPay":     caps.AadhaarPay,
-		"StatusCheck":    caps.StatusCheck,
+		"AadhaarPay":  caps.AadhaarPay,
+		"StatusCheck": caps.StatusCheck,
 	} {
 		if enabled {
 			t.Errorf("%s capability is advertised but no specification exists for it", name)
 		}
+	}
+	// Everything with a specification sheet, exercised against the provider's
+	// development host, must be advertised. A capability left off here silently
+	// disables the control in the UI.
+	for name, enabled := range map[string]bool{
+		"Onboard":        caps.Onboard,
+		"OnboardStatus":  caps.OnboardStatus,
+		"BankList":       caps.BankList,
+		"MerchantKYC":    caps.MerchantKYC,
+		"Register":       caps.Register,
+		"MerchantAuth":   caps.MerchantAuth,
+		"CashWithdrawal": caps.CashWithdrawal,
+		"BalanceEnquiry": caps.BalanceEnquiry,
+		"MiniStatement":  caps.MiniStatement,
+	} {
+		if !enabled {
+			t.Errorf("%s capability should be advertised: it is a documented endpoint", name)
+		}
+	}
+}
+
+func TestTransact_MissingFieldsRejectedLocally(t *testing.T) {
+	// An empty request is refused before any HTTP call: the provider answers a
+	// generic rejection that is far harder to act on than naming the fields.
+	doer := &stubDoer{status: 200, body: "{}"}
+	_, err := testClient(t, doer).Transact(context.Background(), TxnRequest{Operation: "cash_withdrawal"})
+	if err == nil {
+		t.Fatal("expected an error for an empty request, got nil")
+	}
+	if errors.Is(err, ErrNotImplemented) {
+		t.Fatalf("error = %v, want a missing-fields error", err)
+	}
+	if !strings.Contains(err.Error(), "missing required fields") {
+		t.Errorf("error %q should name the missing fields", err)
+	}
+	if doer.calls != 0 {
+		t.Errorf("doer calls = %d, want 0: validation must precede dispatch", doer.calls)
 	}
 }
 

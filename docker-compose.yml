@@ -120,6 +120,14 @@ services:
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-utilihub@admin}
       SEED_RETAILER_EMAIL: ${SEED_RETAILER_EMAIL:-retailer.demo@gmail.com}
       SEED_RETAILER_PASSWORD: ${SEED_RETAILER_PASSWORD:-demo@retailer}
+      # A second retailer seeded already past KYC and AEPS onboarding, so the
+      # provider integration can be exercised without stepping a fresh retailer
+      # through admin approval first.
+      SEED_AEPS_RETAILER_EMAIL: ${SEED_AEPS_RETAILER_EMAIL:-aeps.test@gmail.com}
+      SEED_AEPS_RETAILER_PASSWORD: ${SEED_AEPS_RETAILER_PASSWORD:-aeps@retailer}
+      SEED_AEPS_RETAILER_PHONE: ${SEED_AEPS_RETAILER_PHONE:-9999999999}
+      SEED_AEPS_RETAILER_MERCHANT_CODE: ${SEED_AEPS_RETAILER_MERCHANT_CODE:-TEST001}
+      SEED_AEPS_RETAILER_BALANCE: ${SEED_AEPS_RETAILER_BALANCE:-25000.00}
 
       # ---------------------------------------------------------------------
       # Provider credentials — UAT / sandbox
@@ -135,6 +143,11 @@ services:
       AEPS_API_KEY: ${AEPS_API_KEY:-kGxc8E68fiU1HYwlImyMGouxlK0MUsqH}
       AEPS_CALLBACK_URL: ${AEPS_CALLBACK_URL:-https://utilipayhub.com/api/v1/webhooks/aeps/onboard}
       AEPS_TIMEOUT: ${AEPS_TIMEOUT:-45s}
+      # Sponsor bank rail, RD-service vendor and terminal type. Excisoft decides
+      # which pipe a partner is live on, so confirm with them before changing.
+      AEPS_BANK_PIPE: ${AEPS_BANK_PIPE:-bank3}
+      AEPS_DEVICE: ${AEPS_DEVICE:-Mantra}
+      AEPS_ACCESS_MODE: ${AEPS_ACCESS_MODE:-SITE}
 
       BC_ENABLED: ${BC_ENABLED:-true}
       BC_BASE_URL: ${BC_BASE_URL:-https://alpha3.mobikwik.com}
