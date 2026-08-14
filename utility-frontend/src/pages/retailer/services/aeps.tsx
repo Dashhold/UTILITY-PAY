@@ -20,6 +20,9 @@ import {
   ShieldCheck,
   ExternalLink,
   Clock,
+  RefreshCw,
+  UserCheck,
+  Landmark,
 } from "lucide-react"
 
 import { DataTable } from "@/components/shared/data-table"
@@ -31,10 +34,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { BiometricCapture } from "@/components/aeps/biometric-capture"
+import { ProviderResponsePanel } from "@/components/aeps/provider-response"
 
 import { api, ApiError } from "@/lib/api"
 import type {
+  AepsBank,
   AepsCapabilities,
+  AepsTwoFactorResult,
+  ProviderResponse,
   Receipt,
   RetailerProfile,
   Settlement,
@@ -56,29 +64,38 @@ import { formatDate, exportToCsv } from "@/lib/utils"
 const MIN_WITHDRAWAL = 100
 const MAX_WITHDRAWAL = 10000
 
-const identifierSchema = z
+/**
+ * The provider requires the customer's Aadhaar number and mobile number as
+ * separate fields, so neither can substitute for the other.
+ */
+const aadhaarSchema = z
   .string()
   .trim()
-  .min(10, "Enter a 10-digit mobile or 12-digit Aadhaar number")
-  .max(12, "Enter a 10-digit mobile or 12-digit Aadhaar number")
-  .regex(/^\d+$/, "Digits only")
-  .refine((v) => v.length === 10 || v.length === 12, "Must be exactly 10 or 12 digits")
+  .regex(/^\d{12}$/, "Enter the 12-digit Aadhaar number")
+
+const mobileSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{10}$/, "Enter the 10-digit mobile number")
 
 /**
- * The form always carries the same three fields; only whether `amount` is
- * validated differs by operation. Declaring one concrete shape rather than a
- * union of two schemas keeps the resolver and the submit handler typed to a
- * single value type.
+ * The form always carries the same fields; only whether `amount` is validated
+ * differs by operation. Declaring one concrete shape rather than a union of two
+ * schemas keeps the resolver and the submit handler typed to a single value type.
  */
 interface TxnFormValues {
-  aadhaarOrMobile: string
-  bankName: string
+  customerAadhaar: string
+  customerMobile: string
+  bankIin: string
   amount: string
 }
 
 const baseSchema = z.object({
-  aadhaarOrMobile: identifierSchema,
-  bankName: z.string().min(1, "Select the customer's bank"),
+  customerAadhaar: aadhaarSchema,
+  customerMobile: mobileSchema,
+  // The IIN, not the name, is what the provider keys on, so the select's value
+  // is the IIN taken from the provider's own bank list.
+  bankIin: z.string().min(1, "Select the customer's bank"),
   amount: z.string(),
 })
 
@@ -128,19 +145,18 @@ function buildSchema(withAmount: boolean) {
 
 type AepsOperation = "cash_withdrawal" | "balance_enquiry" | "mini_statement" | "aadhaar_pay"
 
-/** Banks offered for AEPS. The provider's IIN list replaces this once supplied. */
-const BANKS = [
-  "State Bank of India",
-  "HDFC Bank",
-  "ICICI Bank",
-  "Axis Bank",
-  "Punjab National Bank",
-  "Bank of Baroda",
-  "Canara Bank",
-  "Union Bank of India",
-  "Kotak Mahindra Bank",
-  "IndusInd Bank",
-] as const
+/**
+ * The day's merchant authentication.
+ *
+ * NPCI requires the retailer to authenticate with their own biometric before
+ * transacting for customers, and the reference the provider returns has to be
+ * quoted on every cash withdrawal that follows. It is held in memory only: it is
+ * valid for this session and persisting it would outlive its validity.
+ */
+interface MerchantSession {
+  merAuthTxnId: string
+  authenticatedAt: Date
+}
 
 const STATUS_OPTIONS = [
   { label: "Success", value: "success" },
@@ -153,6 +169,9 @@ export function AepsWorkspace() {
   const [tab, setTab] = React.useState("cash_withdrawal")
   const [caps, setCaps] = React.useState<AepsCapabilities | null>(null)
   const [profile, setProfile] = React.useState<RetailerProfile | null>(null)
+  const [banks, setBanks] = React.useState<AepsBank[]>([])
+  const [banksError, setBanksError] = React.useState<string | null>(null)
+  const [session, setSession] = React.useState<MerchantSession | null>(null)
   const [loading, setLoading] = React.useState(true)
 
   const load = React.useCallback(async () => {
@@ -170,9 +189,29 @@ export function AepsWorkspace() {
     }
   }, [])
 
+  /**
+   * The bank list is loaded separately and its failure is not fatal.
+   *
+   * It is the only AEPS call needing no merchant context, so it can succeed while
+   * onboarding is incomplete and fail while everything else works. Folding it
+   * into `load` would let a provider outage blank the whole workspace.
+   */
+  const loadBanks = React.useCallback(async () => {
+    setBanksError(null)
+    try {
+      const res = await api.aeps.banks()
+      setBanks(res.banks.filter((b) => b.active))
+    } catch (err) {
+      setBanksError(
+        err instanceof ApiError ? err.message : "Could not load the provider's bank list",
+      )
+    }
+  }, [])
+
   React.useEffect(() => {
     void load()
-  }, [load])
+    void loadBanks()
+  }, [load, loadBanks])
 
   if (loading) {
     return (
@@ -218,6 +257,8 @@ export function AepsWorkspace() {
 
       {!onboarded && <OnboardingGate profile={profile} onDone={load} />}
 
+      {onboarded && <MerchantSessionBanner session={session} onGoToAuth={() => setTab("merchant")} />}
+
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <div className="rounded-lg border border-gray-200 bg-white">
           <TabsList className="flex w-full flex-wrap justify-start gap-1 border-b border-gray-200 bg-gray-50/60 p-2">
@@ -232,6 +273,12 @@ export function AepsWorkspace() {
             </TabsTrigger>
             <TabsTrigger value="aadhaar_pay" className="gap-2">
               <IndianRupee className="size-4" /> Aadhaar Pay
+            </TabsTrigger>
+            <TabsTrigger value="merchant" className="gap-2">
+              <UserCheck className="size-4" /> Merchant Auth
+            </TabsTrigger>
+            <TabsTrigger value="banks" className="gap-2">
+              <Landmark className="size-4" /> Banks
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-2">
               <RotateCcw className="size-4" /> History
@@ -249,7 +296,12 @@ export function AepsWorkspace() {
                 description="Dispense cash from the customer's Aadhaar-linked bank account"
                 available={caps?.cashWithdrawal ?? false}
                 onboarded={onboarded}
+                banks={banks}
+                banksError={banksError}
+                onRetryBanks={loadBanks}
+                session={session}
                 withAmount
+                requiresMerchantAuth
               />
             </TabsContent>
 
@@ -260,6 +312,10 @@ export function AepsWorkspace() {
                 description="Check the available balance in the customer's account"
                 available={caps?.balanceEnquiry ?? false}
                 onboarded={onboarded}
+                banks={banks}
+                banksError={banksError}
+                onRetryBanks={loadBanks}
+                session={session}
               />
             </TabsContent>
 
@@ -270,6 +326,10 @@ export function AepsWorkspace() {
                 description="Retrieve the customer's last few transactions"
                 available={caps?.miniStatement ?? false}
                 onboarded={onboarded}
+                banks={banks}
+                banksError={banksError}
+                onRetryBanks={loadBanks}
+                session={session}
               />
             </TabsContent>
 
@@ -280,8 +340,26 @@ export function AepsWorkspace() {
                 description="Collect a merchant payment using the customer's Aadhaar and fingerprint"
                 available={caps?.aadhaarPay ?? false}
                 onboarded={onboarded}
+                banks={banks}
+                banksError={banksError}
+                onRetryBanks={loadBanks}
+                session={session}
                 withAmount
+                requiresMerchantAuth
               />
+            </TabsContent>
+
+            <TabsContent value="merchant" className="mt-0">
+              <MerchantPanel
+                caps={caps}
+                profile={profile}
+                onAuthenticated={setSession}
+                onProfileChanged={load}
+              />
+            </TabsContent>
+
+            <TabsContent value="banks" className="mt-0">
+              <BankListPanel banks={banks} error={banksError} onRetry={loadBanks} />
             </TabsContent>
 
             <TabsContent value="history" className="mt-0">
@@ -294,6 +372,56 @@ export function AepsWorkspace() {
           </div>
         </div>
       </Tabs>
+    </div>
+  )
+}
+
+/**
+ * Shows whether the day's merchant authentication has been done.
+ *
+ * A withdrawal without it is refused before any wallet hold is placed, so
+ * surfacing the state up front avoids a retailer capturing a customer's
+ * fingerprint only to be turned away.
+ */
+function MerchantSessionBanner({
+  session,
+  onGoToAuth,
+}: {
+  session: MerchantSession | null
+  onGoToAuth: () => void
+}) {
+  if (session) {
+    return (
+      <div className="flex flex-col gap-3 rounded-lg border border-success-200 bg-success-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-2.5">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success-600" />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Merchant authenticated</p>
+            <p className="text-xs text-gray-700">
+              Reference <span className="font-mono">{session.merAuthTxnId}</span>, at{" "}
+              {session.authenticatedAt.toLocaleTimeString()}. Cash withdrawal is enabled.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-2.5">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+        <div>
+          <p className="text-sm font-semibold text-gray-900">Daily merchant authentication pending</p>
+          <p className="text-xs text-gray-700">
+            Authenticate with your own fingerprint before performing a cash withdrawal. Balance
+            enquiry and mini statement do not require it.
+          </p>
+        </div>
+      </div>
+      <Button variant="outline" size="sm" className="shrink-0" onClick={onGoToAuth}>
+        <UserCheck className="size-4" /> Authenticate now
+      </Button>
     </div>
   )
 }
@@ -313,6 +441,8 @@ function OnboardingGate({
   onDone: () => void
 }) {
   const [submitting, setSubmitting] = React.useState(false)
+  const [checking, setChecking] = React.useState(false)
+  const [providerResponse, setProviderResponse] = React.useState<ProviderResponse>(null)
   const status = profile?.aepsOnboardStatus ?? "not_started"
 
   async function start() {
@@ -328,6 +458,41 @@ function OnboardingGate({
       toast.error(err instanceof ApiError ? err.message : "Could not start onboarding")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  /**
+   * Asks the provider directly.
+   *
+   * The provider is authoritative on onboarding: their browser redirect is
+   * unauthenticated and only ever records a pending state, so this is the only
+   * call that can move the account to completed.
+   */
+  async function check() {
+    setChecking(true)
+    try {
+      const res = await api.aeps.onboardStatus()
+      setProviderResponse(res.providerResponse ?? null)
+
+      if (res.approved) {
+        toast.success("The provider has approved your onboarding.")
+        onDone()
+        return
+      }
+      // The provider's own wording is shown: it names the missing step, which our
+      // own summary would lose.
+      toast.warning(res.message || `Provider reports: ${res.isApproved || "not yet approved"}`)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        // A rejection carries the provider's body too, and that is the part worth
+        // showing: it names the reason our own message cannot.
+        setProviderResponse(err.providerResponse ?? null)
+        toast.error(err.message)
+      } else {
+        toast.error("Could not check onboarding status")
+      }
+    } finally {
+      setChecking(false)
     }
   }
 
@@ -363,43 +528,465 @@ function OnboardingGate({
   }[message.tone]
 
   return (
-    <div className={`flex flex-col gap-4 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between ${toneClasses}`}>
-      <div className="flex items-start gap-3">
-        {status === "pending" ? (
-          <Clock className={`mt-0.5 size-5 shrink-0 ${iconClasses}`} />
-        ) : (
-          <AlertTriangle className={`mt-0.5 size-5 shrink-0 ${iconClasses}`} />
-        )}
-        <div>
-          <p className="text-sm font-semibold text-gray-900">{message.title}</p>
-          <p className="mt-0.5 max-w-2xl text-sm text-gray-700">{message.body}</p>
+    <div className={`flex flex-col gap-4 rounded-lg border p-4 ${toneClasses}`}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          {status === "pending" ? (
+            <Clock className={`mt-0.5 size-5 shrink-0 ${iconClasses}`} />
+          ) : (
+            <AlertTriangle className={`mt-0.5 size-5 shrink-0 ${iconClasses}`} />
+          )}
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{message.title}</p>
+            <p className="mt-0.5 max-w-2xl text-sm text-gray-700">{message.body}</p>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button onClick={check} disabled={checking} variant="outline">
+            {checking ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Check with provider
+          </Button>
+          <Button onClick={start} disabled={submitting} variant="brand">
+            {submitting ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+            {status === "pending" ? "Resume onboarding" : "Start onboarding"}
+            <ExternalLink className="size-3.5" />
+          </Button>
         </div>
       </div>
 
-      <Button onClick={start} disabled={submitting} variant="brand" className="shrink-0">
-        {submitting ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
-        {status === "pending" ? "Resume onboarding" : "Start onboarding"}
-        <ExternalLink className="size-3.5" />
-      </Button>
+      <ProviderResponsePanel response={providerResponse} label="Onboarding status response" />
     </div>
   )
 }
 
-/** Wraps an operation form with availability and onboarding guards. */
+/**
+ * Merchant registration and daily authentication.
+ *
+ * Both calls authenticate the retailer's own biometric rather than a customer's,
+ * which is why they are grouped away from the customer-facing operations. Their
+ * order matters: registration is once per merchant, authentication is once per
+ * day and gates cash withdrawal.
+ */
+function MerchantPanel({
+  caps,
+  profile,
+  onAuthenticated,
+  onProfileChanged,
+}: {
+  caps: AepsCapabilities | null
+  profile: RetailerProfile | null
+  onAuthenticated: (session: MerchantSession) => void
+  onProfileChanged: () => void
+}) {
+  return (
+    <div className="mx-auto grid w-full max-w-5xl gap-6 lg:grid-cols-2">
+      <MerchantAuthCard
+        title="Daily merchant authentication"
+        description="Required once per day before any cash withdrawal"
+        icon={<UserCheck className="size-4 text-white" />}
+        available={caps?.merchantAuth ?? false}
+        submitLabel="Authenticate"
+        profile={profile}
+        onSubmit={(body) => api.aeps.merchantAuth(body)}
+        onSuccess={(res) => {
+          onAuthenticated({ merAuthTxnId: res.merAuthTxnId, authenticatedAt: new Date() })
+          toast.success("Merchant authenticated. Cash withdrawal is now enabled.")
+        }}
+      />
+
+      <MerchantAuthCard
+        title="Merchant biometric registration"
+        description="One-time registration of your fingerprint with the provider"
+        icon={<Fingerprint className="size-4 text-white" />}
+        available={caps?.register ?? false}
+        submitLabel="Register biometric"
+        profile={profile}
+        onSubmit={(body) => api.aeps.register(body)}
+        onSuccess={() => {
+          toast.success("Biometric registered with the provider.")
+          onProfileChanged()
+        }}
+      />
+
+      <div className="lg:col-span-2">
+        <MerchantKycCard
+          available={caps?.merchantKyc ?? false}
+          onActivated={() => {
+            toast.success("The provider has activated your merchant account.")
+            onProfileChanged()
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+/** The two-factor body both merchant calls take. */
+interface MerchantAuthBody {
+  aadhaar: string
+  pidData: string
+  latitude?: string
+  longitude?: string
+}
+
+/**
+ * Merchant registration or authentication.
+ *
+ * Registration and authentication take the same input and differ only in which
+ * endpoint they call and what is done with the result, so they share this card
+ * rather than duplicating the capture and error handling twice.
+ */
+function MerchantAuthCard({
+  title,
+  description,
+  icon,
+  available,
+  submitLabel,
+  profile,
+  onSubmit,
+  onSuccess,
+}: {
+  title: string
+  description: string
+  icon: React.ReactNode
+  available: boolean
+  submitLabel: string
+  profile: RetailerProfile | null
+  onSubmit: (body: MerchantAuthBody) => Promise<AepsTwoFactorResult>
+  onSuccess: (result: AepsTwoFactorResult) => void
+}) {
+  // The retailer's Aadhaar is prefilled from their profile when it is on file,
+  // but stays editable: the number registered with the provider is not always the
+  // one captured during our own KYC.
+  const [aadhaar, setAadhaar] = React.useState("")
+  const [pidData, setPidData] = React.useState("")
+  const [submitting, setSubmitting] = React.useState(false)
+  const [providerResponse, setProviderResponse] = React.useState<ProviderResponse>(null)
+
+  const valid = /^\d{12}$/.test(aadhaar.trim()) && pidData.trim() !== ""
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!valid) {
+      toast.error("Enter your 12-digit Aadhaar number and capture your fingerprint")
+      return
+    }
+
+    setSubmitting(true)
+    setProviderResponse(null)
+    try {
+      const res = await onSubmit({ aadhaar: aadhaar.trim(), pidData })
+      setProviderResponse(res.providerResponse ?? null)
+      onSuccess(res)
+      // The capture is single-use: the provider rejects a replayed PID block, so
+      // keeping it would only produce a confusing second failure.
+      setPidData("")
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setProviderResponse(err.providerResponse ?? null)
+        toast.error(err.message)
+      } else {
+        toast.error(`${title} failed`)
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="border-b border-gray-100 bg-gray-50/60">
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-gray-900">{icon}</div>
+          <div>
+            <CardTitle className="text-base">{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-6">
+        {!available ? (
+          <UnavailableNotice
+            title="Not enabled"
+            body="This provider call is not currently enabled for your account."
+          />
+        ) : (
+          <form className="space-y-5" onSubmit={submit}>
+            <Field
+              label="Your Aadhaar number"
+              required
+              hint={
+                profile?.aadhaarLast4
+                  ? `Your profile has Aadhaar ending ${profile.aadhaarLast4}. Only the last 4 digits are stored.`
+                  : "Only the last 4 digits are stored."
+              }
+            >
+              <Input
+                inputMode="numeric"
+                maxLength={12}
+                value={aadhaar}
+                onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, ""))}
+                placeholder="12-digit Aadhaar number"
+                className="h-11 font-mono"
+              />
+            </Field>
+
+            <BiometricCapture
+              label="Your fingerprint"
+              pidData={pidData}
+              onChange={setPidData}
+              disabled={submitting}
+            />
+
+            <Button type="submit" variant="brand" size="lg" className="w-full" disabled={!valid || submitting}>
+              {submitting ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+              {submitting ? "Submitting..." : submitLabel}
+            </Button>
+
+            <ProviderResponsePanel response={providerResponse} />
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Provider-side merchant activation.
+ *
+ * Separate from the two-factor calls because it additionally requires a date of
+ * birth, and because it is done once at activation rather than per day.
+ */
+function MerchantKycCard({
+  available,
+  onActivated,
+}: {
+  available: boolean
+  onActivated: () => void
+}) {
+  const [aadhaar, setAadhaar] = React.useState("")
+  const [dob, setDob] = React.useState("")
+  const [pidData, setPidData] = React.useState("")
+  const [submitting, setSubmitting] = React.useState(false)
+  const [providerResponse, setProviderResponse] = React.useState<ProviderResponse>(null)
+
+  const valid = /^\d{12}$/.test(aadhaar.trim()) && dob !== "" && pidData.trim() !== ""
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!valid) {
+      toast.error("Aadhaar number, date of birth and a fingerprint capture are all required")
+      return
+    }
+
+    setSubmitting(true)
+    setProviderResponse(null)
+    try {
+      const res = await api.aeps.merchantKyc({ aadhaar: aadhaar.trim(), dob, pidData })
+      setProviderResponse(res.providerResponse ?? null)
+      setPidData("")
+
+      if (res.activated) {
+        onActivated()
+        return
+      }
+      toast.warning(res.message || "The provider did not activate the account.")
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setProviderResponse(err.providerResponse ?? null)
+        toast.error(err.message)
+      } else {
+        toast.error("Merchant activation failed")
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="border-b border-gray-100 bg-gray-50/60">
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-gray-900">
+            <ShieldCheck className="size-4 text-white" />
+          </div>
+          <div>
+            <CardTitle className="text-base">Merchant activation (KYC)</CardTitle>
+            <CardDescription>
+              Completes provider-side activation with your own Aadhaar and fingerprint
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-6">
+        {!available ? (
+          <UnavailableNotice
+            title="Not enabled"
+            body="This provider call is not currently enabled for your account."
+          />
+        ) : (
+          <form className="space-y-5" onSubmit={submit}>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label="Your Aadhaar number" required>
+                <Input
+                  inputMode="numeric"
+                  maxLength={12}
+                  value={aadhaar}
+                  onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, ""))}
+                  placeholder="12-digit Aadhaar number"
+                  className="h-11 font-mono"
+                />
+              </Field>
+
+              <Field label="Date of birth" required hint="As recorded on your Aadhaar">
+                <Input
+                  type="date"
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                  className="h-11"
+                />
+              </Field>
+            </div>
+
+            <BiometricCapture
+              label="Your fingerprint"
+              pidData={pidData}
+              onChange={setPidData}
+              disabled={submitting}
+            />
+
+            <Button type="submit" variant="brand" size="lg" className="w-full" disabled={!valid || submitting}>
+              {submitting ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+              {submitting ? "Submitting..." : "Activate merchant account"}
+            </Button>
+
+            <ProviderResponsePanel response={providerResponse} />
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * The provider's sponsor bank list.
+ *
+ * Shown as its own panel because it is the integration's connectivity check: it
+ * is the one AEPS call that needs no merchant context, so it answers "can we
+ * reach the provider at all" independently of onboarding state.
+ */
+function BankListPanel({
+  banks,
+  error,
+  onRetry,
+}: {
+  banks: AepsBank[]
+  error: string | null
+  onRetry: () => void
+}) {
+  const [search, setSearch] = React.useState("")
+
+  const filtered = React.useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return banks
+    // Matching on the IIN too: support requests quote the IIN, not the name.
+    return banks.filter((b) => b.name.toLowerCase().includes(q) || b.iin.includes(q))
+  }, [banks, search])
+
+  return (
+    <Card>
+      <CardHeader className="border-b border-gray-100 bg-gray-50/60">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="text-base">Provider bank list</CardTitle>
+            <CardDescription>
+              {error
+                ? "The provider's bank list could not be loaded"
+                : `${banks.length} active banks available for AEPS`}
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            <RefreshCw className="size-4" /> Refresh
+          </Button>
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-6">
+        {error ? (
+          <UnavailableNotice title="Bank list unavailable" body={error} />
+        ) : (
+          <div className="space-y-4">
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by bank name or IIN..."
+              className="h-11 max-w-sm"
+            />
+
+            <div className="overflow-hidden rounded-lg border border-gray-200">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50/60">
+                    <TableHead>Bank</TableHead>
+                    <TableHead>IIN</TableHead>
+                    <TableHead>Aadhaar Pay</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((bank) => (
+                    <TableRow key={bank.iin}>
+                      <TableCell className="text-sm text-gray-900">{bank.name}</TableCell>
+                      <TableCell className="font-mono text-xs text-gray-700">{bank.iin}</TableCell>
+                      <TableCell className="text-xs text-gray-600">
+                        {bank.supportsAadhaarPay ? bank.aadhaarPayIin || "Supported" : "Not supported"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filtered.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="py-8 text-center text-sm text-gray-500">
+                        No bank matches that search.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Wraps an operation form with availability, onboarding and prerequisite guards. */
 function OperationPanel({
   operation,
   title,
   description,
   available,
   onboarded,
+  banks,
+  banksError,
+  onRetryBanks,
+  session,
   withAmount = false,
+  requiresMerchantAuth = false,
 }: {
   operation: AepsOperation
   title: string
   description: string
   available: boolean
   onboarded: boolean
+  banks: AepsBank[]
+  banksError: string | null
+  onRetryBanks: () => void
+  session: MerchantSession | null
   withAmount?: boolean
+  requiresMerchantAuth?: boolean
 }) {
   if (!available) {
     return (
@@ -419,7 +1006,37 @@ function OperationPanel({
     )
   }
 
-  return <TransactionForm operation={operation} title={title} description={description} withAmount={withAmount} />
+  // Without the bank list there is no IIN to transact against, and the provider
+  // rejects a request that omits it. Better to say so than to offer a form that
+  // cannot be completed.
+  if (banksError || banks.length === 0) {
+    return (
+      <div className="mx-auto flex max-w-xl flex-col items-center gap-4">
+        <UnavailableNotice
+          title="The provider's bank list is unavailable"
+          body={
+            banksError ??
+            "The provider returned no active banks, so there is no bank to transact against yet."
+          }
+        />
+        <Button variant="outline" size="sm" onClick={onRetryBanks}>
+          <RefreshCw className="size-4" /> Try again
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <TransactionForm
+      operation={operation}
+      title={title}
+      description={description}
+      withAmount={withAmount}
+      banks={banks}
+      requiresMerchantAuth={requiresMerchantAuth}
+      sessionMerAuthTxnId={session?.merAuthTxnId}
+    />
+  )
 }
 
 function UnavailableNotice({ title, body }: { title: string; body: string }) {
@@ -438,14 +1055,30 @@ function TransactionForm({
   title,
   description,
   withAmount,
+  banks,
+  requiresMerchantAuth,
+  sessionMerAuthTxnId,
 }: {
   operation: AepsOperation
   title: string
   description: string
   withAmount: boolean
+  banks: AepsBank[]
+  /** Whether this operation must quote a merchant authentication reference. */
+  requiresMerchantAuth: boolean
+  /** The reference from this session's merchant authentication, when there is one. */
+  sessionMerAuthTxnId?: string
 }) {
-  const [captured, setCaptured] = React.useState(false)
-  const [capturing, setCapturing] = React.useState(false)
+  const [pidData, setPidData] = React.useState("")
+  /**
+   * The merchant authentication reference.
+   *
+   * Prefilled from the session but editable, because the reference is issued by
+   * the provider and outlives this browser tab: a retailer who authenticated
+   * earlier, or on another device, would otherwise be locked out of a withdrawal
+   * they are entitled to perform.
+   */
+  const [merAuthTxnId, setMerAuthTxnId] = React.useState(sessionMerAuthTxnId ?? "")
   const [submitting, setSubmitting] = React.useState(false)
   const [receipt, setReceipt] = React.useState<Receipt | null>(null)
 
@@ -459,32 +1092,23 @@ function TransactionForm({
 
   const form = useForm<TxnFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { aadhaarOrMobile: "", bankName: "", amount: "" },
+    defaultValues: { customerAadhaar: "", customerMobile: "", bankIin: "", amount: "" },
   })
 
-  function captureBiometric() {
-    setCapturing(true)
-    // The real capture comes from an RD-service device over a local bridge. Until
-    // that device integration is wired, this stands in for the capture step and
-    // produces no PID block, which the backend treats as a missing capture.
-    setTimeout(() => {
-      setCapturing(false)
-      setCaptured(true)
-      toast.success("Biometric captured")
-    }, 1200)
-  }
+  const captured = pidData.trim() !== ""
 
   function reset() {
     setReceipt(null)
-    setCaptured(false)
-    setCapturing(false)
+    setPidData("")
+    // The authentication reference is deliberately kept: it is valid for the day
+    // and re-typing it before every withdrawal would be pointless friction.
     idempotencyKey.current = crypto.randomUUID()
-    form.reset({ aadhaarOrMobile: "", bankName: "", amount: "" })
+    form.reset({ customerAadhaar: "", customerMobile: "", bankIin: "", amount: "" })
   }
 
   async function onSubmit(values: TxnFormValues) {
     if (!captured) {
-      toast.error("Capture the customer's biometric before submitting")
+      toast.error("Capture the customer's fingerprint before submitting")
       return
     }
 
@@ -493,9 +1117,15 @@ function TransactionForm({
       const result = await api.aeps.transact(
         {
           operation,
-          aadhaarOrMobile: values.aadhaarOrMobile,
-          bankName: values.bankName,
+          customerAadhaar: values.customerAadhaar,
+          customerMobile: values.customerMobile,
+          bankIin: values.bankIin,
+          // The name is sent for the receipt and the transaction record; the
+          // provider itself routes on the IIN.
+          bankName: banks.find((b) => b.iin === values.bankIin)?.name,
           amount: withAmount ? toMoneyString(values.amount ?? "") : undefined,
+          pidData,
+          merAuthTxnId: requiresMerchantAuth ? merAuthTxnId.trim() : undefined,
         },
         idempotencyKey.current,
       )
@@ -543,32 +1173,58 @@ function TransactionForm({
 
         <CardContent className="p-6">
           <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
-            <Field
-              label="Aadhaar or mobile number"
-              required
-              error={form.formState.errors.aadhaarOrMobile?.message}
-              hint="12 digits for Aadhaar, 10 for mobile. Only the last 4 digits are stored."
-            >
-              <Input
-                inputMode="numeric"
-                maxLength={12}
-                placeholder="Enter the customer's number"
-                className="h-11 font-mono"
-                {...form.register("aadhaarOrMobile")}
-              />
-            </Field>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field
+                label="Customer's Aadhaar number"
+                required
+                error={form.formState.errors.customerAadhaar?.message}
+                hint="Only the last 4 digits are stored."
+              >
+                <Input
+                  inputMode="numeric"
+                  maxLength={12}
+                  placeholder="12-digit Aadhaar number"
+                  className="h-11 font-mono"
+                  {...form.register("customerAadhaar")}
+                />
+              </Field>
 
-            <Field label="Customer's bank" required error={form.formState.errors.bankName?.message}>
+              <Field
+                label="Customer's mobile number"
+                required
+                error={form.formState.errors.customerMobile?.message}
+                hint="The number registered with their bank."
+              >
+                <Input
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="10-digit mobile number"
+                  className="h-11 font-mono"
+                  {...form.register("customerMobile")}
+                />
+              </Field>
+            </div>
+
+            <Field
+              label="Customer's bank"
+              required
+              error={form.formState.errors.bankIin?.message}
+              hint="Listed by the provider. The bank's IIN is what the transaction is routed on."
+            >
               <select
                 className="flex h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus-visible:border-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/10"
-                {...form.register("bankName")}
+                {...form.register("bankIin")}
               >
                 <option value="">Select a bank</option>
-                {BANKS.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
+                {banks
+                  // Aadhaar Pay runs on a different IIN, so only banks that
+                  // publish one can be offered for it.
+                  .filter((b) => operation !== "aadhaar_pay" || b.supportsAadhaarPay)
+                  .map((b) => (
+                    <option key={b.iin} value={b.iin}>
+                      {b.name} ({b.iin})
+                    </option>
+                  ))}
               </select>
             </Field>
 
@@ -593,10 +1249,30 @@ function TransactionForm({
               </Field>
             )}
 
+            {requiresMerchantAuth && (
+              <Field
+                label="Merchant authentication reference"
+                required
+                hint={
+                  sessionMerAuthTxnId
+                    ? "Taken from your authentication in this session."
+                    : "The MerAuthTxnId returned by your daily merchant authentication."
+                }
+              >
+                <Input
+                  value={merAuthTxnId}
+                  onChange={(e) => setMerAuthTxnId(e.target.value)}
+                  placeholder="MerAuthTxnId"
+                  className="h-11 font-mono"
+                />
+              </Field>
+            )}
+
             <BiometricCapture
-              captured={captured}
-              capturing={capturing}
-              onCapture={captureBiometric}
+              label="Customer's fingerprint"
+              pidData={pidData}
+              onChange={setPidData}
+              disabled={submitting}
             />
 
             <Button
@@ -604,7 +1280,7 @@ function TransactionForm({
               variant="brand"
               size="lg"
               className="w-full"
-              disabled={!captured || submitting}
+              disabled={!captured || submitting || (requiresMerchantAuth && merAuthTxnId.trim() === "")}
             >
               {submitting ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
               {submitting ? "Submitting..." : `Submit ${title}`}
@@ -654,65 +1330,6 @@ function Field({
   )
 }
 
-function BiometricCapture({
-  captured,
-  capturing,
-  onCapture,
-}: {
-  captured: boolean
-  capturing: boolean
-  onCapture: () => void
-}) {
-  return (
-    <div className="space-y-2">
-      <Label className="text-sm font-medium text-gray-700">
-        Biometric authentication <span className="text-danger-500">*</span>
-      </Label>
-
-      <div
-        className={`rounded-lg border-2 p-6 transition-colors ${
-          captured ? "border-success-300 bg-success-50" : "border-dashed border-gray-300 bg-gray-50"
-        }`}
-      >
-        <div className="flex flex-col items-center gap-3 text-center">
-          {capturing ? (
-            <>
-              <Loader2 className="size-10 animate-spin text-gray-900" />
-              <p className="text-sm font-medium text-gray-900">Capturing...</p>
-              <p className="text-xs text-gray-500">Keep the customer's finger on the scanner</p>
-            </>
-          ) : captured ? (
-            <>
-              <CheckCircle2 className="size-10 text-success-600" />
-              <p className="text-sm font-semibold text-success-700">Biometric captured</p>
-            </>
-          ) : (
-            <>
-              <Fingerprint className="size-10 text-gray-400" />
-              <p className="text-sm font-medium text-gray-900">Ready to capture</p>
-              <p className="max-w-sm text-xs text-gray-500">
-                Connect a UIDAI-certified RD-service device and capture the customer's
-                fingerprint. Consent must be taken before capture.
-              </p>
-            </>
-          )}
-
-          <Button
-            type="button"
-            variant={captured ? "outline" : "brand"}
-            size="sm"
-            disabled={capturing || captured}
-            onClick={onCapture}
-          >
-            <Fingerprint className="size-4" />
-            {captured ? "Captured" : capturing ? "Capturing..." : "Capture biometric"}
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /** The post-transaction receipt, including the pending and review states. */
 function TransactionReceipt({
   receipt,
@@ -750,6 +1367,9 @@ function TransactionReceipt({
     | { date: string; narration: string; type: string; amount: string; balance: string }[]
     | undefined
   const customerBalance = current.metadata?.customerBalance as string | undefined
+  // Retained on the transaction by the backend, so it survives a page reload and
+  // is available for the provider's request/response evidence.
+  const providerResponse = current.metadata?.providerResponse
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -837,6 +1457,14 @@ function TransactionReceipt({
                 </Table>
               </div>
             )}
+
+            <div className="w-full">
+              <ProviderResponsePanel
+                response={providerResponse}
+                label="Provider response"
+                defaultOpen={!isSuccess}
+              />
+            </div>
 
             <div className="grid w-full gap-3 sm:grid-cols-2">
               {isPending ? (

@@ -20,6 +20,13 @@ type APIError struct {
 	Code     string
 	Message  string
 	Outcome  Outcome
+	// Raw is the provider's response body, retained verbatim.
+	//
+	// A rejection is exactly the case where the provider's own wording matters
+	// most, both for support and for the request/response evidence UAT sign-off
+	// requires, so it is carried on the error rather than discarded. It is
+	// deliberately left out of Error() to keep log lines bounded.
+	Raw string
 }
 
 // Error implements error.

@@ -28,6 +28,12 @@ type Error struct {
 	Message string `json:"message"`
 	// Fields carries per-field validation messages.
 	Fields map[string]string `json:"fields,omitempty"`
+	// Details carries additional machine-readable context about the failure.
+	//
+	// It exists for upstream rejections, where the provider's own response body is
+	// the useful artefact and a single message string discards it. Anything put
+	// here reaches the client, so it must contain no unmasked identifiers.
+	Details map[string]any `json:"details,omitempty"`
 }
 
 // Meta carries pagination details.
@@ -101,6 +107,17 @@ func Fail(c *gin.Context, status int, code, message string) {
 	c.AbortWithStatusJSON(status, Envelope{
 		Success: false,
 		Error:   &Error{Code: code, Message: message},
+	})
+}
+
+// FailWithDetails writes an error response carrying additional context.
+//
+// Used for upstream failures so the provider's verbatim response survives into
+// the client, which both support and provider UAT evidence depend on.
+func FailWithDetails(c *gin.Context, status int, code, message string, details map[string]any) {
+	c.AbortWithStatusJSON(status, Envelope{
+		Success: false,
+		Error:   &Error{Code: code, Message: message, Details: details},
 	})
 }
 

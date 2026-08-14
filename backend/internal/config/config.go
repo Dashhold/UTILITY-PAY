@@ -108,6 +108,17 @@ type AEPSConfig struct {
 	CallbackURL string
 	Timeout     time.Duration
 	Enabled     bool
+
+	// BankPipe selects the sponsor bank rail the provider routes through
+	// (`bank_pipe` / `pipe` in the provider documentation). Which pipe a partner
+	// is live on is decided by the provider, so it is configurable rather than
+	// hard-coded.
+	BankPipe string
+	// Device is the RD-service vendor name sent as `device`, e.g. Mantra.
+	Device string
+	// AccessMode is `accessmodetype` / `accessmode`: SITE for a web terminal,
+	// APP for a mobile client.
+	AccessMode string
 }
 
 // BharatConnectConfig holds credentials for the MobiKwik Bharat Connect
@@ -205,6 +216,9 @@ func Load() (*Config, error) {
 			CallbackURL: env("AEPS_CALLBACK_URL", ""),
 			Timeout:     envDuration("AEPS_TIMEOUT", 45*time.Second),
 			Enabled:     envBool("AEPS_ENABLED", true),
+			BankPipe:    env("AEPS_BANK_PIPE", "bank3"),
+			Device:      env("AEPS_DEVICE", "Mantra"),
+			AccessMode:  env("AEPS_ACCESS_MODE", "SITE"),
 		},
 		BharatConnect: BharatConnectConfig{
 			BaseURL:           env("BC_BASE_URL", "https://alpha3.mobikwik.com"),

@@ -22,6 +22,11 @@ export type MoneyString = string
 
 export interface AepsCapabilities {
   onboard: boolean
+  onboardStatus: boolean
+  bankList: boolean
+  merchantKyc: boolean
+  register: boolean
+  merchantAuth: boolean
   cashWithdrawal: boolean
   balanceEnquiry: boolean
   miniStatement: boolean
@@ -272,6 +277,71 @@ export interface AepsOnboardResult {
   redirectUrl: string
   onboardPending: boolean
   message: string
+}
+
+/**
+ * The provider's response body, echoed verbatim.
+ *
+ * Surfaced in the UI because provider UAT sign-off requires evidence of the
+ * exact request and response for each endpoint. It is unknown rather than any:
+ * nothing may read fields off it without narrowing first.
+ */
+export type ProviderResponse = unknown
+
+/**
+ * A bank from the provider's AEPS bank list.
+ *
+ * The transactional endpoints key on `iin`, so a bank must be chosen from this
+ * list rather than from a locally maintained set that could drift.
+ */
+export interface AepsBank {
+  id: string
+  name: string
+  iin: string
+  /** Present only for banks that also support Aadhaar Pay. */
+  aadhaarPayIin?: string
+  active: boolean
+  supportsAadhaarPay: boolean
+}
+
+export interface AepsBankListResult {
+  banks: AepsBank[]
+  message: string
+  responseCode: string
+  providerResponse?: ProviderResponse
+}
+
+export interface AepsOnboardStatusResult {
+  /** True only when the provider reports the merchant as Accepted. */
+  approved: boolean
+  /** The provider's verbatim verdict, e.g. "Accepted". */
+  isApproved: string
+  /** The provider's is_casa flag: 0 not allowed, 1 allowed, 2 pending activation. */
+  casa: string
+  responseCode: string
+  message: string
+  providerResponse?: ProviderResponse
+}
+
+/** The result of merchant biometric registration or daily merchant authentication. */
+export interface AepsTwoFactorResult {
+  success: boolean
+  /**
+   * The authentication reference a subsequent cash withdrawal must quote. The
+   * provider returns it only on success.
+   */
+  merAuthTxnId: string
+  responseCode: string
+  errorCode: string
+  message: string
+  providerResponse?: ProviderResponse
+}
+
+export interface AepsMerchantKycResult {
+  activated: boolean
+  responseCode: string
+  message: string
+  providerResponse?: ProviderResponse
 }
 
 export interface Settlement {

@@ -317,7 +317,14 @@ func registerRetailerAEPS(r *gin.RouterGroup, deps Dependencies) {
 	a := r.Group("/aeps")
 
 	a.GET("/capabilities", deps.AEPSHandler.Capabilities)
+	a.GET("/banks", deps.AEPSHandler.Banks)
 	a.POST("/onboard", deps.AEPSHandler.Onboard)
+	// The provider is authoritative on onboarding, so this is a POST: it can
+	// change the retailer's stored onboarding state.
+	a.POST("/onboard/status", deps.AEPSHandler.OnboardStatus)
+	a.POST("/merchant-kyc", deps.AEPSHandler.MerchantKYC)
+	a.POST("/register", deps.AEPSHandler.Register)
+	a.POST("/merchant-auth", deps.AEPSHandler.MerchantAuth)
 	a.POST("/transact", deps.AEPSHandler.Transact)
 	a.GET("/transactions", deps.AEPSHandler.Transactions)
 	a.GET("/settlements", deps.AEPSHandler.Settlements)

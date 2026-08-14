@@ -8,8 +8,12 @@
 import type {
   AdminDashboard,
   AdminLedgerEntry,
+  AepsBankListResult,
   AepsCapabilities,
+  AepsMerchantKycResult,
   AepsOnboardResult,
+  AepsOnboardStatusResult,
+  AepsTwoFactorResult,
   Announcement,
   Biller,
   BillerCategory,
@@ -61,7 +65,13 @@ const USER_KEY = "up-auth"
 interface Envelope<T> {
   success: boolean
   data?: T
-  error?: { code: string; message: string; fields?: Record<string, string> }
+  error?: {
+    code: string
+    message: string
+    fields?: Record<string, string>
+    /** Extra failure context, e.g. an upstream provider's verbatim response. */
+    details?: Record<string, unknown>
+  }
   meta?: {
     page: number
     pageSize: number
@@ -109,13 +119,32 @@ export class ApiError extends Error {
   readonly status: number
   readonly code: string
   readonly fields?: Record<string, string>
+  /**
+   * Extra context the backend attached to the failure.
+   *
+   * Upstream rejections put the provider's verbatim response body here under
+   * `providerResponse`, which is what a provider's UAT evidence is read from.
+   */
+  readonly details?: Record<string, unknown>
 
-  constructor(status: number, code: string, message: string, fields?: Record<string, string>) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    fields?: Record<string, string>,
+    details?: Record<string, unknown>,
+  ) {
     super(message)
     this.name = "ApiError"
     this.status = status
     this.code = code
     this.fields = fields
+    this.details = details
+  }
+
+  /** The provider's raw response body, when the backend supplied one. */
+  get providerResponse(): unknown {
+    return this.details?.providerResponse
   }
 
   get isAuthError() {
@@ -310,6 +339,7 @@ async function rawRequest<T>(path: string, options: RequestOptions = {}): Promis
     envelope.error?.code ?? "UNKNOWN_ERROR",
     envelope.error?.message ?? "Something went wrong.",
     envelope.error?.fields,
+    envelope.error?.details,
   )
 }
 
@@ -506,16 +536,71 @@ export const api = {
 
   aeps: {
     capabilities: () => request<AepsCapabilities>("/api/v1/retailer/aeps/capabilities"),
+
+    /**
+     * The provider's sponsor bank list.
+     *
+     * Needs no merchant context, which makes it the integration's connectivity
+     * check as well as the source of the IIN every transactional call keys on.
+     */
+    banks: () => request<AepsBankListResult>("/api/v1/retailer/aeps/banks"),
+
     onboard: () => request<AepsOnboardResult>("/api/v1/retailer/aeps/onboard", { method: "POST" }),
+
+    /**
+     * Asks the provider whether merchant KYC has completed.
+     *
+     * A POST because it is authoritative and updates the stored onboarding
+     * state; the browser callback is unauthenticated and only ever a hint.
+     */
+    onboardStatus: () =>
+      request<AepsOnboardStatusResult>("/api/v1/retailer/aeps/onboard/status", { method: "POST" }),
+
+    /** Provider-side merchant activation with the retailer's own biometric. */
+    merchantKyc: (body: {
+      aadhaar: string
+      pidData: string
+      /** The retailer's date of birth as YYYY-MM-DD. */
+      dob: string
+      latitude?: string
+      longitude?: string
+    }) => request<AepsMerchantKycResult>("/api/v1/retailer/aeps/merchant-kyc", { method: "POST", body }),
+
+    /** One-time merchant biometric registration. */
+    register: (body: {
+      aadhaar: string
+      pidData: string
+      latitude?: string
+      longitude?: string
+    }) => request<AepsTwoFactorResult>("/api/v1/retailer/aeps/register", { method: "POST", body }),
+
+    /**
+     * The day's merchant two-factor authentication.
+     *
+     * NPCI requires the retailer to re-authenticate with their own biometric
+     * before transacting for customers. The returned merAuthTxnId must be quoted
+     * on every subsequent cash withdrawal.
+     */
+    merchantAuth: (body: {
+      aadhaar: string
+      pidData: string
+      latitude?: string
+      longitude?: string
+    }) => request<AepsTwoFactorResult>("/api/v1/retailer/aeps/merchant-auth", { method: "POST", body }),
 
     transact: (
       body: {
         operation: "cash_withdrawal" | "balance_enquiry" | "mini_statement" | "aadhaar_pay"
-        aadhaarOrMobile: string
-        bankIin?: string
+        customerAadhaar: string
+        customerMobile: string
+        bankIin: string
         bankName?: string
         amount?: string
-        pidData?: string
+        pidData: string
+        /** Required for cash withdrawal: the reference from merchantAuth. */
+        merAuthTxnId?: string
+        latitude?: string
+        longitude?: string
       },
       idempotencyKey?: string,
     ) => request<Receipt>("/api/v1/retailer/aeps/transact", { method: "POST", body, idempotencyKey }),

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
@@ -23,6 +24,21 @@ type SeedAccount struct {
 	Phone    string
 	Role     models.Role
 	ShopName string
+
+	// MerchantCode pins the AEPS merchant code rather than deriving one from the
+	// generated user id. The provider keys every AEPS call on this value, so an
+	// account used against their host has to carry the code that was actually
+	// onboarded there.
+	MerchantCode string
+	// AEPSReady provisions the account past every gate the AEPS endpoints check:
+	// verified KYC and completed provider onboarding. It exists so the provider
+	// integration can be exercised without first walking a fresh retailer
+	// through admin approval, which is unrelated to what is being tested.
+	AEPSReady bool
+	// WalletOpeningBalance funds the wallet. Cash withdrawal is debited before
+	// dispatch, so without an opening balance it fails on the hold rather than
+	// reaching the provider. Empty means no opening credit.
+	WalletOpeningBalance string
 }
 
 // SeedAccounts returns the bootstrap credentials.
@@ -47,6 +63,21 @@ func SeedAccounts() []SeedAccount {
 			Phone:    seedEnv("SEED_RETAILER_PHONE", "9876500001"),
 			Role:     models.RoleRetailer,
 			ShopName: seedEnv("SEED_RETAILER_SHOP", "Demo Digital Services"),
+		},
+		{
+			// A second retailer that is already through KYC and provider
+			// onboarding. The demo retailer above deliberately starts at
+			// not_submitted so the onboarding journey itself stays testable; this
+			// one exists to test what comes after it.
+			Name:                 seedEnv("SEED_AEPS_RETAILER_NAME", "AEPS Test Retailer"),
+			Email:                seedEnv("SEED_AEPS_RETAILER_EMAIL", "aeps.test@gmail.com"),
+			Password:             seedEnv("SEED_AEPS_RETAILER_PASSWORD", "aeps@retailer"),
+			Phone:                seedEnv("SEED_AEPS_RETAILER_PHONE", "9999999999"),
+			Role:                 models.RoleRetailer,
+			ShopName:             seedEnv("SEED_AEPS_RETAILER_SHOP", "AEPS Test Services"),
+			MerchantCode:         seedEnv("SEED_AEPS_RETAILER_MERCHANT_CODE", "TEST001"),
+			AEPSReady:            true,
+			WalletOpeningBalance: seedEnv("SEED_AEPS_RETAILER_BALANCE", "25000.00"),
 		},
 	}
 }
@@ -139,9 +170,14 @@ func seedAccounts(db *gorm.DB, log *slog.Logger) error {
 			var city models.City
 			_ = tx.Where("name = ?", "Mohali").First(&city).Error
 
+			merchantCode := acct.MerchantCode
+			if merchantCode == "" {
+				merchantCode = "SH" + user.ID.String()[:5]
+			}
+
 			retailer := models.Retailer{
 				UserID:        user.ID,
-				MerchantCode:  "SH" + user.ID.String()[:5],
+				MerchantCode:  merchantCode,
 				ShopName:      acct.ShopName,
 				FirmName:      acct.ShopName,
 				AddressLine:   "420, 4th Floor, Metro Trade Center, VIP Road",
@@ -158,7 +194,17 @@ func seedAccounts(db *gorm.DB, log *slog.Logger) error {
 			if city.ID != (models.City{}).ID {
 				retailer.CityID = &city.ID
 			}
-			return tx.Create(&retailer).Error
+			if acct.AEPSReady {
+				now := time.Now().UTC()
+				retailer.KYCStatus = models.KYCVerified
+				retailer.AEPSOnboardStatus = models.OnboardCompleted
+				retailer.AEPSOnboardedAt = &now
+			}
+			if err := tx.Create(&retailer).Error; err != nil {
+				return err
+			}
+
+			return seedOpeningBalance(tx, retailer.ID, acct.WalletOpeningBalance)
 		})
 		if err != nil {
 			return err
@@ -168,6 +214,54 @@ func seedAccounts(db *gorm.DB, log *slog.Logger) error {
 			slog.String("email", email),
 			slog.String("role", string(acct.Role)),
 		)
+	}
+	return nil
+}
+
+// seedOpeningBalance credits a newly created wallet inside the caller's
+// transaction.
+//
+// The ledger is authoritative and retailers.wallet_balance is a projection of
+// it, so the opening credit is written as a real ledger row rather than by
+// setting the column directly. Skipping the ledger would leave the account
+// permanently failing WalletService.ReconcileBalance.
+//
+// This duplicates a small part of WalletService.applyLocked rather than calling
+// it: the service layer imports this package's models but seeding runs before
+// any service exists, and reaching the other way would be an import cycle.
+func seedOpeningBalance(tx *gorm.DB, retailerID uuid.UUID, amount string) error {
+	amount = strings.TrimSpace(amount)
+	if amount == "" {
+		return nil
+	}
+
+	opening, err := decimal.NewFromString(amount)
+	if err != nil {
+		return fmt.Errorf("parse opening balance %q: %w", amount, err)
+	}
+	if opening.LessThanOrEqual(decimal.Zero) {
+		return nil
+	}
+
+	// The retailer row was created in this same transaction, so the balance
+	// before this credit is unambiguously zero and no row lock is needed.
+	ledger := models.WalletLedger{
+		RetailerID:    retailerID,
+		Direction:     models.LedgerCredit,
+		Reason:        models.ReasonAdminAdjustment,
+		Amount:        opening,
+		BalanceBefore: decimal.Zero,
+		BalanceAfter:  opening,
+		Narration:     "Seeded opening balance for testing",
+	}
+	if err := tx.Create(&ledger).Error; err != nil {
+		return fmt.Errorf("write opening balance ledger: %w", err)
+	}
+
+	if err := tx.Model(&models.Retailer{}).
+		Where("id = ?", retailerID).
+		Update("wallet_balance", opening).Error; err != nil {
+		return fmt.Errorf("set opening wallet balance: %w", err)
 	}
 	return nil
 }
