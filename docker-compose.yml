@@ -167,6 +167,9 @@ services:
       BC_GCM_IV_SIZE: ${BC_GCM_IV_SIZE:-12}
       BC_TIMEOUT: ${BC_TIMEOUT:-45s}
       BC_TOKEN_SAFETY_WINDOW: ${BC_TOKEN_SAFETY_WINDOW:-30m}
+      # Enable only for UAT testing to log encrypted and decrypted payloads.
+      # MUST be false in production.
+      BC_UAT_LOGGING: ${BC_UAT_LOGGING:-false}
 
       RECON_ENABLED: ${RECON_ENABLED:-true}
       RECON_INTERVAL: ${RECON_INTERVAL:-60s}
