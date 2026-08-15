@@ -209,6 +209,7 @@ export interface BillerCategory {
 export interface Biller {
   id: string
   billerId: string
+  operatorId?: string // Numeric operator code for API calls (e.g., "31" for MSEDCL). Required for live API.
   name: string
   category: string
   coverage?: string

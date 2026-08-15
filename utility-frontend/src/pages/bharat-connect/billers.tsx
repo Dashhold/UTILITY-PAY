@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/shared/empty-state"
 import { BharatConnectScreen, JourneyStepper } from "@/components/brand/bharat-connect-screen"
 import { CategoryIcon } from "@/components/brand/category-icon"
 import { BRAND_COLORS, LIVE_CATEGORIES } from "@/lib/brand"
-import { billersByCategory, findBiller, popularBillers, searchBillers } from "@/lib/bharat-connect/billers"
+import { useBillers } from "@/lib/bharat-connect/use-billers"
 import { recentBillerIds } from "@/lib/bharat-connect/service"
 import { useBharatConnectFlow } from "@/lib/bharat-connect/flow-context"
 import type { Biller } from "@/lib/bharat-connect/types"
@@ -27,16 +27,31 @@ export function BharatConnectBillers() {
 
   const category = LIVE_CATEGORIES.find((c) => c.slug === categorySlug)
 
-  const all = React.useMemo(() => billersByCategory(categorySlug), [categorySlug])
-  const results = React.useMemo(() => searchBillers(query, categorySlug), [query, categorySlug])
-  const popular = React.useMemo(() => popularBillers(categorySlug), [categorySlug])
-  const recent = React.useMemo(
-    () =>
-      recentBillerIds()
-        .map(findBiller)
-        .filter((b): b is Biller => !!b && b.categorySlug === categorySlug),
-    [categorySlug]
+  // Fetch billers from API
+  const { billers: allBillers, loading } = useBillers(category?.name, query.trim().length >= 2 ? query : undefined)
+
+  // Filter billers by category if not already filtered by API
+  const all = React.useMemo(() => 
+    allBillers.filter((b) => b.categorySlug === categorySlug && b.live),
+    [allBillers, categorySlug]
   )
+
+  const results = React.useMemo(() => 
+    query.trim().length >= 2 ? all : [],
+    [query, all]
+  )
+
+  const popular = React.useMemo(() => 
+    all.filter((b) => b.popular).slice(0, 10),
+    [all]
+  )
+
+  const recent = React.useMemo(() => {
+    const recentIds = recentBillerIds()
+    return recentIds
+      .map((id) => all.find((b) => b.id === id))
+      .filter((b): b is Biller => !!b && b.categorySlug === categorySlug)
+  }, [all, categorySlug])
 
   if (!category) return <Navigate to="/retailer/bharat-connect/categories" replace />
 

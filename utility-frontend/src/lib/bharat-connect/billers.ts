@@ -37,25 +37,25 @@ function biller(b: Omit<Biller, "live"> & { live?: boolean }): Biller {
 export const BILLERS: Biller[] = [
   // ---------------------------------------------------------------- Electricity
   biller({
-    id: "MSEDCL00000MAH01", name: "MSEDCL (Mahavitaran)", categorySlug: "electricity",
+    id: "MSEDCL00000MAH01", operatorId: "31", name: "MSEDCL (Mahavitaran)", categorySlug: "electricity",
     coverage: "Maharashtra", fetchRequirement: "MANDATORY", amountExactness: "Exact",
     supportsAdhoc: false, supportsPartPay: false, ccf: { type: "flat", value: 5 }, popular: true,
     params: [consumerNumber("Consumer Number", 12)],
   }),
   biller({
-    id: "ADANIELE0000MUM01", name: "Adani Electricity Mumbai Ltd", categorySlug: "electricity",
+    id: "ADANIELE0000MUM01", operatorId: "31", name: "Adani Electricity Mumbai Ltd", categorySlug: "electricity",
     coverage: "Mumbai", fetchRequirement: "MANDATORY", amountExactness: "Exact",
     supportsAdhoc: false, supportsPartPay: false, ccf: { type: "flat", value: 5 }, popular: true,
     params: [consumerNumber("Consumer Number", 9)],
   }),
   biller({
-    id: "TATAPOWE0000DEL01", name: "Tata Power Delhi Distribution Ltd", categorySlug: "electricity",
+    id: "TATAPOWE0000DEL01", operatorId: "31", name: "Tata Power Delhi Distribution Ltd", categorySlug: "electricity",
     coverage: "Delhi", fetchRequirement: "MANDATORY", amountExactness: "Exact",
     supportsAdhoc: false, supportsPartPay: false, ccf: { type: "flat", value: 5 }, popular: true,
     params: [{ key: "caNumber", label: "CA Number", type: "number", minLength: 9, maxLength: 9, placeholder: "9-digit CA number", helpText: "Contract Account number on your bill" }],
   }),
   biller({
-    id: "BSESRAJD0000DEL01", name: "BSES Rajdhani Power Ltd", categorySlug: "electricity",
+    id: "BSESRAJD0000DEL01", operatorId: "31", name: "BSES Rajdhani Power Ltd", categorySlug: "electricity",
     coverage: "Delhi", fetchRequirement: "MANDATORY", amountExactness: "Exact",
     supportsAdhoc: false, supportsPartPay: false, ccf: { type: "flat", value: 5 }, popular: true,
     params: [consumerNumber("CA Number", 9)],

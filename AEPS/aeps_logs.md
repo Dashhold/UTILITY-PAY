@@ -1,506 +1,512 @@
-# AEPS API Testing Logs
-**Provider**: Excisoft AEPS  
-**Environment**: Development/UAT  
-**Base URL**: `https://apidev.excisofttech.com`  
-**API Key**: `Bw6MxIIzqXJ2edfmagbYysyMqWtcWUze`  
-**Test Date**: August 3, 2026  
-**Platform**: UtiliPay Hub  
+# AEPS API Test Logs
+
+## API Key
+```
+kGxc8E68fiU1HYwlImyMGouxlK0MUsqH
+```
+
+## Base URL
+```
+https://apidev.excisofttech.com
+```
 
 ---
 
-## Test Summary
+## Test 1: Bank List API
 
-| Test # | Endpoint | Method | Status | Result |
-|--------|----------|--------|--------|--------|
-| 1 | `/api/v1/aeps/onboard` | POST | ✅ | Success |
-| 2 | `/api/v1/aeps/onboard` (Missing Field) | POST | ✅ | Error Handled |
-| 3 | `/api/v1/aeps/onboard` (Invalid API Key) | POST | ✅ | Auth Failed |
-
----
-
-## Test 1: Successful Onboarding Request
-
-### Request Details
-**Endpoint**: `POST https://apidev.excisofttech.com/api/v1/aeps/onboard`  
-**Content-Type**: `multipart/form-data`  
-**Test Timestamp**: 2026-08-03 10:00:00 IST  
-
-### Request Payload
+### Endpoint
 ```
-apiKey: Bw6MxIIzqXJ2edfmagbYysyMqWtcWUze
-mobile: 9694310969
-merchantcode: TEST001
-firm_name: Test Retail Shop
-email: test@utilipay.com
-is_new: 1
-callback_url: https://utilipayhub.com/api/v1/webhooks/aeps/onboard
+POST /api/v1/aeps/get_bank_list
 ```
 
-### cURL Command
+### Request
 ```bash
-curl -X POST 'https://apidev.excisofttech.com/api/v1/aeps/onboard' \
-  -H 'Accept: application/json' \
-  -F 'apiKey=Bw6MxIIzqXJ2edfmagbYysyMqWtcWUze' \
-  -F 'mobile=9694310969' \
-  -F 'merchantcode=TEST001' \
-  -F 'firm_name=Test Retail Shop' \
-  -F 'email=test@utilipay.com' \
-  -F 'is_new=1' \
-  -F 'callback_url=https://utilipayhub.com/api/v1/webhooks/aeps/onboard'
+curl -X POST "https://apidev.excisofttech.com/api/v1/aeps/get_bank_list" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "apiKey=kGxc8E68fiU1HYwlImyMGouxlK0MUsqH"
 ```
 
-### Expected Response (from Documentation)
+### Request Parameters
+```
+apiKey: kGxc8E68fiU1HYwlImyMGouxlK0MUsqH
+```
+
+### Response
 ```json
 {
+  "status": true,
+  "response_code": 1,
+  "banklist": {
     "status": true,
-    "response_code": 1,
-    "redirecturl": "https://merchantkyc.com/onboarding?env=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-    "onboard_pending": 1,
-    "message": "Balance successfully fetched"
+    "message": "Request Completed",
+    "data": [
+      {
+        "id": "1",
+        "bankName": "Airtel Payment Bank",
+        "iinno": "990320",
+        "activeFlag": "1",
+        "aadharpayiinno": null
+      },
+      {
+        "id": "2",
+        "bankName": "Allahabad Bank",
+        "iinno": "608112",
+        "activeFlag": "1",
+        "aadharpayiinno": null
+      },
+      {
+        "id": "3",
+        "bankName": "Allahabad UP Gramin Bank",
+        "iinno": "607024",
+        "activeFlag": "1",
+        "aadharpayiinno": null
+      },
+      {
+        "id": "31",
+        "bankName": "Federal Bank",
+        "iinno": "607363",
+        "activeFlag": "1",
+        "aadharpayiinno": "607322"
+      },
+      {
+        "id": "37",
+        "bankName": "ICICI Bank",
+        "iinno": "508534",
+        "activeFlag": "1",
+        "aadharpayiinno": null
+      },
+      {
+        "id": "35",
+        "bankName": "HDFC Bank",
+        "iinno": "607152",
+        "activeFlag": "1",
+        "aadharpayiinno": null
+      },
+      {
+        "id": "85",
+        "bankName": "State Bank of India",
+        "iinno": "607094",
+        "activeFlag": "1",
+        "aadharpayiinno": null
+      }
+    ]
+  },
+  "message": "Bank list successfully fetched"
 }
 ```
 
-### Response Analysis
-- **HTTP Status**: 200 OK
-- **Response Time**: ~2-3 seconds
-- **status**: `true` (boolean)
-- **response_code**: `1` (integer)
-- **redirecturl**: Valid JWT-encoded KYC onboarding URL
-- **onboard_pending**: `1` (indicates KYC not completed)
-- **message**: Success message from provider
+### HTTP Status
+```
+200 OK
+```
 
-### Observations
-✅ **Success**: API accepts multipart/form-data encoding  
-✅ **Success**: Returns valid redirect URL for hosted KYC  
-✅ **Success**: JWT token in redirect URL is properly formed  
-✅ **Success**: Response follows documented format  
+### Response Time
+```
+1.104493s
+```
+
+### Result
+✅ SUCCESS - Retrieved 107 banks
 
 ---
 
-## Test 2: Missing Required Field (merchantcode)
+## Test 2: Onboarding API
 
-### Request Details
-**Endpoint**: `POST https://apidev.excisofttech.com/api/v1/aeps/onboard`  
-**Content-Type**: `multipart/form-data`  
-**Test Timestamp**: 2026-08-03 10:05:00 IST  
-
-### Request Payload
+### Endpoint
 ```
-apiKey: Bw6MxIIzqXJ2edfmagbYysyMqWtcWUze
-mobile: 9694310969
-merchantcode: [OMITTED - Testing validation]
-firm_name: Test Retail Shop
-email: test@utilipay.com
-is_new: 1
-callback_url: https://utilipayhub.com/api/v1/webhooks/aeps/onboard
+POST /api/v1/aeps/onboard
 ```
 
-### cURL Command
+### Request
 ```bash
-curl -X POST 'https://apidev.excisofttech.com/api/v1/aeps/onboard' \
-  -H 'Accept: application/json' \
-  -F 'apiKey=Bw6MxIIzqXJ2edfmagbYysyMqWtcWUze' \
-  -F 'mobile=9694310969' \
-  -F 'firm_name=Test Retail Shop' \
-  -F 'email=test@utilipay.com' \
-  -F 'is_new=1' \
-  -F 'callback_url=https://utilipayhub.com/api/v1/webhooks/aeps/onboard'
+curl -X POST "https://apidev.excisofttech.com/api/v1/aeps/onboard" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "apiKey=kGxc8E68fiU1HYwlImyMGouxlK0MUsqH&mobile=9999999999&merchantcode=TEST001&firm=TestFirm&email=test@example.com&is_new=1&callback=https://utilipayhub.com/callback"
 ```
 
-### Expected Response (from Documentation)
-```json
-{
-    "status": "error",
-    "message": "The field 'merchantcode' is required and cannot be empty."
-}
+### Request Parameters
 ```
-
-### Response Analysis
-- **HTTP Status**: 200 OK (provider returns errors in body)
-- **status**: `"error"` (string, not boolean)
-- **message**: Clear error message indicating missing field
-
-### Observations
-✅ **Success**: API properly validates required fields  
-✅ **Success**: Error message is clear and actionable  
-⚠️ **Note**: Status polymorphism - `true` (boolean) for success, `"error"` (string) for failure  
-⚠️ **Note**: Error response still returns HTTP 200, not 4xx  
-
----
-
-## Test 3: Invalid API Key
-
-### Request Details
-**Endpoint**: `POST https://apidev.excisofttech.com/api/v1/aeps/onboard`  
-**Content-Type**: `multipart/form-data`  
-**Test Timestamp**: 2026-08-03 10:10:00 IST  
-
-### Request Payload
-```
-apiKey: INVALID_KEY_FOR_TESTING
-mobile: 9694310969
+apiKey: kGxc8E68fiU1HYwlImyMGouxlK0MUsqH
+mobile: 9999999999
 merchantcode: TEST001
-firm_name: Test Retail Shop
-email: test@utilipay.com
+firm: TestFirm
+email: test@example.com
 is_new: 1
-callback_url: https://utilipayhub.com/api/v1/webhooks/aeps/onboard
+callback: https://utilipayhub.com/callback
 ```
 
-### cURL Command
+### Response
+```json
+{
+  "status": true,
+  "response_code": 1,
+  "redirecturl": "https://paysprint.co.in/onboarding?env=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJwYXJ0bmVyaWQiOiIyMDE4MTE2OSIsIm1lcmNoYW50Y29kZSI6IlRFU1QwMDEiLCJtb2JpbGUiOiI5OTk5OTk5OTk5IiwiaXNfbmV3IjoiMSIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsImZpcm1uYW1lIjoiVGVzdEZpcm0iLCJyZXFpZCI6IjE3ODYxMDAwNTgxNzkiLCJjYWxsYmFjayI6Imh0dHBzOlwvXC91dGlsaXBheWh1Yi5jb21cL2NhbGxiYWNrIiwicGlwZSI6bnVsbCwiY3VycmVudF90aW1lIjoxNzg2MTAwMDU4fQ.mNyxlbasbu1jQ7sRqzWlrOdbnMkaqU87VaVS0REs9eY",
+  "onboard_pending": 1,
+  "message": "Onboarding URL generated successfully."
+}
+```
+
+### HTTP Status
+```
+200 OK
+```
+
+### Response Time
+```
+0.370897s
+```
+
+### Result
+✅ SUCCESS - Onboarding URL generated
+
+---
+
+## Test 3: Onboard Status Check API
+
+### Endpoint
+```
+POST /api/v1/aeps/onboard_status_check
+```
+
+### Request
 ```bash
-curl -X POST 'https://apidev.excisofttech.com/api/v1/aeps/onboard' \
-  -H 'Accept: application/json' \
-  -F 'apiKey=INVALID_KEY_FOR_TESTING' \
-  -F 'mobile=9694310969' \
-  -F 'merchantcode=TEST001' \
-  -F 'firm_name=Test Retail Shop' \
-  -F 'email=test@utilipay.com' \
-  -F 'is_new=1' \
-  -F 'callback_url=https://utilipayhub.com/api/v1/webhooks/aeps/onboard'
+curl -X POST "https://apidev.excisofttech.com/api/v1/aeps/onboard_status_check" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "apiKey=kGxc8E68fiU1HYwlImyMGouxlK0MUsqH&merchantcode=TEST001&mobile=9999999999&pipe=bank2"
 ```
 
-### Expected Response
+### Request Parameters
+```
+apiKey: kGxc8E68fiU1HYwlImyMGouxlK0MUsqH
+merchantcode: TEST001
+mobile: 9999999999
+pipe: bank2
+```
+
+### Response
 ```json
 {
-    "status": "error",
-    "message": "Invalid API key" 
+  "response_code": 2,
+  "status": false,
+  "message": "Merchantcode not found"
 }
 ```
 
-### Response Analysis
-- **HTTP Status**: 200 OK or 401 Unauthorized (to be confirmed)
-- **status**: `"error"` or `false`
-- **message**: Authentication failure message
-
-### Observations
-⚠️ **Needs Confirmation**: Exact error message for invalid API key  
-⚠️ **Needs Confirmation**: HTTP status code for authentication failures  
-
----
-
-## Additional Endpoints (Not Yet Documented)
-
-The following endpoints are referenced in the UtiliPay platform but **not yet included in provider documentation**:
-
-### 1. Cash Withdrawal
-**Endpoint**: `POST /api/v1/aeps/cash-withdrawal` *(path to be confirmed)*  
-**Status**: ⏳ **Awaiting Documentation**  
-
-**Required Fields** (estimated):
-- apiKey
-- merchantcode
-- mobile
-- aadhaar (customer)
-- bank_iin
-- amount
-- pid_data (biometric)
-- transaction_id
-
-### 2. Balance Enquiry
-**Endpoint**: `POST /api/v1/aeps/balance-enquiry` *(path to be confirmed)*  
-**Status**: ⏳ **Awaiting Documentation**  
-
-**Required Fields** (estimated):
-- apiKey
-- merchantcode
-- mobile
-- aadhaar (customer)
-- bank_iin
-- pid_data (biometric)
-- transaction_id
-
-### 3. Mini Statement
-**Endpoint**: `POST /api/v1/aeps/mini-statement` *(path to be confirmed)*  
-**Status**: ⏳ **Awaiting Documentation**  
-
-**Required Fields** (estimated):
-- apiKey
-- merchantcode
-- mobile
-- aadhaar (customer)
-- bank_iin
-- pid_data (biometric)
-- transaction_id
-
-### 4. Aadhaar Pay
-**Endpoint**: `POST /api/v1/aeps/aadhaar-pay` *(path to be confirmed)*  
-**Status**: ⏳ **Awaiting Documentation**  
-
-**Required Fields** (estimated):
-- apiKey
-- merchantcode
-- mobile
-- aadhaar (customer)
-- bank_iin
-- amount
-- pid_data (biometric)
-- transaction_id
-
-### 5. Transaction Status Check
-**Endpoint**: `POST /api/v1/aeps/status-check` *(path to be confirmed)*  
-**Status**: ⏳ **Awaiting Documentation**  
-
-**Required Fields** (estimated):
-- apiKey
-- merchantcode
-- transaction_id or reference_id
-
----
-
-## Implementation Notes
-
-### UtiliPay Backend Integration Status
-
-#### ✅ Implemented
-1. **Onboarding** - Fully implemented and tested
-   - Multipart form-data encoding
-   - Field validation
-   - API key redaction in logs
-   - Error handling for polymorphic status field
-   - Audit trail integration
-
-#### ⏳ Pending Documentation
-The following are implemented with placeholders but return `ErrNotImplemented` until API specification is provided:
-
-2. **Cash Withdrawal** - Awaiting endpoint path and field names
-3. **Balance Enquiry** - Awaiting endpoint path and field names
-4. **Mini Statement** - Awaiting endpoint path and field names
-5. **Aadhaar Pay** - Awaiting endpoint path and field names
-6. **Status Check** - Awaiting endpoint path and field names
-
-### Security Considerations
-
-✅ **API Key Protection**:
-- API key is never logged in plaintext
-- Redacted as `***REDACTED***` in audit trails
-- Stored in environment variables, not committed to repository
-
-✅ **Customer Data Protection**:
-- Aadhaar numbers masked in logs (show only last 4 digits)
-- Mobile numbers masked in logs
-- PII never stored in plaintext logs
-
-✅ **Audit Trail**:
-- All API calls logged with timestamps
-- Request/response bodies captured (with redactions)
-- Retailer ID associated with each transaction
-- Idempotency keys for retryable operations
-
----
-
-## Response Format Specifications
-
-### Success Response Format
-```json
-{
-    "status": true,              // boolean
-    "response_code": 1,          // integer
-    "redirecturl": "string",     // URL (for onboarding)
-    "onboard_pending": 1,        // integer (1 = pending, 0 = complete)
-    "message": "string"          // success message
-}
+### HTTP Status
+```
+200 OK
 ```
 
-### Error Response Format
-```json
-{
-    "status": "error",           // string (NOT boolean)
-    "message": "string"          // error description
-}
+### Response Time
+```
+0.231757s
 ```
 
-### Polymorphic Fields Handling
-
-⚠️ **Important**: The API returns polymorphic JSON types that require special handling:
-
-1. **status field**:
-   - Success: `true` (boolean)
-   - Error: `"error"` (string)
-   
-2. **onboard_pending field**:
-   - Can be: boolean, integer (0/1), or string
-
-Our implementation uses a `flexBool` type to handle all these variations safely.
+### Result
+❌ EXPECTED ERROR - Merchantcode not found (test merchant not onboarded)
 
 ---
 
-## Required Information from Provider
+## Test 4: Register API (Biometric Registration)
 
-To complete the AEPS integration, we need the following specifications:
-
-### High Priority (Blocking Production Launch)
-
-1. **Cash Withdrawal Endpoint**
-   - ✅ Endpoint URL/path
-   - ✅ Request field names and types
-   - ✅ Response format
-   - ✅ Error codes and messages
-   - ✅ Timeout recommendations
-   - ✅ Sample success/failure responses
-
-2. **Balance Enquiry Endpoint**
-   - ✅ Endpoint URL/path
-   - ✅ Request field names and types
-   - ✅ Response format (balance field name/format)
-   - ✅ Error codes and messages
-
-3. **Status Check Endpoint**
-   - ✅ Endpoint URL/path
-   - ✅ Request field (transaction ID parameter name)
-   - ✅ Response format
-   - ✅ All possible status values
-
-### Medium Priority (Enhanced Features)
-
-4. **Mini Statement Endpoint**
-   - ✅ Endpoint URL/path
-   - ✅ Request format
-   - ✅ Statement entry format (JSON structure)
-   - ✅ Maximum statement rows returned
-
-5. **Aadhaar Pay Endpoint**
-   - ✅ Endpoint URL/path
-   - ✅ Request format
-   - ✅ Response format
-
-### General Requirements
-
-6. **Biometric PID Data Format**
-   - ✅ Expected format (XML? Base64?)
-   - ✅ RD Service device compatibility
-   - ✅ Sample PID data blocks
-
-7. **Bank IIN Codes**
-   - ✅ Complete list of supported bank IIN codes
-   - ✅ Bank name → IIN mapping
-
-8. **Error Codes Reference**
-   - ✅ Complete list of error codes
-   - ✅ Retry recommendations per error type
-   - ✅ Customer-facing message guidelines
-
-9. **Rate Limits**
-   - ✅ API call rate limits
-   - ✅ Retry-after recommendations
-   - ✅ Burst allowances
-
-10. **Webhook/Callback Specifications**
-    - ✅ Callback URL requirements
-    - ✅ Payload format for onboarding completion
-    - ✅ Signature/authentication method
-    - ✅ Retry policy
-
----
-
-## Platform Readiness
-
-### UtiliPay Backend Status
-
-✅ **Ready**:
-- Multipart form-data encoding
-- Audit logging with PII redaction
-- Error handling for polymorphic responses
-- Idempotency for retryable operations
-- Timeout configuration
-- Capability discovery API
-
-⏳ **Pending Provider Specs**:
-- Transactional endpoints implementation
-- Status check implementation
-- Bank IIN code validation
-- Complete error code mapping
-
-### UtiliPay Frontend Status
-
-✅ **Ready**:
-- AEPS workspace UI
-- Onboarding flow integration
-- Capability-based feature flags
-- Loading states for async operations
-
-⏳ **Pending**:
-- Biometric device integration (awaiting RD Service specs)
-- Transaction forms (awaiting field names)
-- Status check UI (awaiting status check API)
-
----
-
-## Testing Checklist
-
-### Onboarding Flow
-- [x] New merchant onboarding (is_new=1)
-- [x] Existing merchant resume (is_new=0)
-- [x] Field validation
-- [x] Invalid API key handling
-- [x] Callback URL handling
-- [ ] Callback webhook receipt (pending webhook spec)
-- [ ] Onboarding completion confirmation
-
-### Transactional Operations (Pending API Specs)
-- [ ] Cash withdrawal success
-- [ ] Cash withdrawal insufficient balance
-- [ ] Cash withdrawal invalid Aadhaar
-- [ ] Balance enquiry
-- [ ] Mini statement retrieval
-- [ ] Aadhaar Pay
-- [ ] Status check for pending transaction
-- [ ] Status check for completed transaction
-
-### Error Handling
-- [x] Network timeout
-- [x] Invalid API key
-- [x] Missing required field
-- [ ] Invalid bank IIN
-- [ ] Invalid biometric data
-- [ ] Insufficient merchant balance
-- [ ] Service temporarily unavailable
-
----
-
-## Contact Information
-
-**Provider**: Excisoft Tech  
-**Integration Support**: *(to be added)*  
-**Support Email**: *(to be added)*  
-**Support Phone**: *(to be added)*  
-
-**UtiliPay Integration Team**:  
-**Email**: adminutilihub@gmail.com  
-**Platform**: https://utilipayhub.com  
-
----
-
-## Appendix: Sample Integration Code
-
-### Backend (Go)
-```go
-// Onboard a retailer
-result, err := aepsClient.Onboard(ctx, aeps.OnboardRequest{
-    Mobile:       retailer.Mobile,
-    MerchantCode: retailer.MerchantCode,
-    FirmName:     retailer.ShopName,
-    Email:        retailer.Email,
-    IsNew:        true,
-    CallbackURL:  "https://utilipayhub.com/api/v1/webhooks/aeps/onboard",
-    RetailerID:   &retailer.ID,
-})
+### Endpoint
+```
+POST /api/v1/aeps/register.php
 ```
 
-### cURL (for manual testing)
+### Request
 ```bash
-curl -X POST 'https://apidev.excisofttech.com/api/v1/aeps/onboard' \
-  -H 'Accept: application/json' \
-  -F 'apiKey=Bw6MxIIzqXJ2edfmagbYysyMqWtcWUze' \
-  -F 'mobile=9694310969' \
-  -F 'merchantcode=SH86561' \
-  -F 'firm_name=Sample Shop' \
-  -F 'email=shop@example.com' \
-  -F 'is_new=1' \
-  -F 'callback_url=https://utilipayhub.com/api/v1/webhooks/aeps/onboard'
+curl -X POST "https://apidev.excisofttech.com/api/v1/aeps/register.php" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "apiKey=kGxc8E68fiU1HYwlImyMGouxlK0MUsqH&mobile=9999999999&adhaarnumber=123456789012&bank_pipe=bank3&device=Mantra&pid=test_pid_data&latitude=26.9124336&longitude=75.7872709&ref_id=TEST123456&submerchantid=TEST001&ipaddress=192.168.1.1&accessmodetype=SITE"
 ```
+
+### Request Parameters
+```
+apiKey: kGxc8E68fiU1HYwlImyMGouxlK0MUsqH
+mobile: 9999999999
+adhaarnumber: 123456789012
+bank_pipe: bank3
+device: Mantra
+pid: test_pid_data
+latitude: 26.9124336
+longitude: 75.7872709
+ref_id: TEST123456
+submerchantid: TEST001
+ipaddress: 192.168.1.1
+accessmodetype: SITE
+```
+
+### Response
+```json
+{
+  "response_code": 24,
+  "status": false,
+  "message": "MerchantID not found.,Please onboard merchant"
+}
+```
+
+### HTTP Status
+```
+200 OK
+```
+
+### Response Time
+```
+0.938779s
+```
+
+### Result
+❌ EXPECTED ERROR - Merchant not onboarded (requires real biometric PID data)
 
 ---
 
-**End of Log**  
-**Document Version**: 1.0  
-**Last Updated**: August 3, 2026
+## Test 5: Merchant Auth API (Two-Factor Authentication)
+
+### Endpoint
+```
+POST /api/v1/aeps/merchant_auth
+```
+
+### Request
+```bash
+curl -X POST "https://apidev.excisofttech.com/api/v1/aeps/merchant_auth" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "apiKey=kGxc8E68fiU1HYwlImyMGouxlK0MUsqH&mobilenumber=9999999999&adhaarnumber=123456789012&bank_pipe=bank3&device=Mantra&data=test_pid_data&latitude=26.9124336&longitude=75.7872709&referenceno=TEST123456&submerchantid=TEST001&ipaddress=192.168.1.1&accessmodetype=SITE"
+```
+
+### Request Parameters
+```
+apiKey: kGxc8E68fiU1HYwlImyMGouxlK0MUsqH
+mobilenumber: 9999999999
+adhaarnumber: 123456789012
+bank_pipe: bank3
+device: Mantra
+data: test_pid_data
+latitude: 26.9124336
+longitude: 75.7872709
+referenceno: TEST123456
+submerchantid: TEST001
+ipaddress: 192.168.1.1
+accessmodetype: SITE
+```
+
+### Response
+```json
+{
+  "response_code": 25,
+  "status": false,
+  "message": "MerchantID not found.,Please onboard merchant"
+}
+```
+
+### HTTP Status
+```
+200 OK
+```
+
+### Response Time
+```
+0.240631s
+```
+
+### Result
+❌ EXPECTED ERROR - Merchant not onboarded (requires real biometric PID data)
+
+---
+
+## Test 6: Cash Withdrawal API
+
+### Endpoint
+```
+POST /api/v1/aeps/withdrawal
+```
+
+### Request
+```bash
+curl -X POST "https://apidev.excisofttech.com/api/v1/aeps/withdrawal" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "apiKey=kGxc8E68fiU1HYwlImyMGouxlK0MUsqH&mobile=9999999999&latitude=26.9124336&longitude=75.7872709&adhaarnumber=123456789012&bank_pipe=bank3&device=Mantra&pid=test_pid_data&ref_id=TEST123456&submerchantid=TEST001&ipaddress=192.168.1.1&accessmodetype=SITE&bank=607094&remark=CW&type=CW&amount=100&MerAuthTxnId=123456789"
+```
+
+### Request Parameters
+```
+apiKey: kGxc8E68fiU1HYwlImyMGouxlK0MUsqH
+mobile: 9999999999
+latitude: 26.9124336
+longitude: 75.7872709
+adhaarnumber: 123456789012
+bank_pipe: bank3
+device: Mantra
+pid: test_pid_data
+ref_id: TEST123456
+submerchantid: TEST001
+ipaddress: 192.168.1.1
+accessmodetype: SITE
+bank: 607094
+remark: CW
+type: CW
+amount: 100
+MerAuthTxnId: 123456789
+```
+
+### Response
+```json
+{
+  "response_code": 25,
+  "status": false,
+  "message": "You do not have permission.,Please onboard merchant"
+}
+```
+
+### HTTP Status
+```
+200 OK
+```
+
+### Response Time
+```
+0.645738s
+```
+
+### Result
+❌ EXPECTED ERROR - No permission (requires merchant onboarding and real biometric data)
+
+---
+
+## Test 7: Balance Enquiry API
+
+### Endpoint
+```
+POST /api/v1/aeps/balanceEnquiry
+```
+
+### Request
+```bash
+curl -X POST "https://apidev.excisofttech.com/api/v1/aeps/balanceEnquiry" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "apiKey=kGxc8E68fiU1HYwlImyMGouxlK0MUsqH&mobile=9999999999&latitude=26.9124336&longitude=75.7872709&adhaarnumber=123456789012&bank_pipe=bank3&device=Mantra&pid=test_pid_data&ref_id=TEST123456&submerchantid=TEST001&ipaddress=192.168.1.1&accessmodetype=SITE&bank=607094&remark=BE&type=BE"
+```
+
+### Request Parameters
+```
+apiKey: kGxc8E68fiU1HYwlImyMGouxlK0MUsqH
+mobile: 9999999999
+latitude: 26.9124336
+longitude: 75.7872709
+adhaarnumber: 123456789012
+bank_pipe: bank3
+device: Mantra
+pid: test_pid_data
+ref_id: TEST123456
+submerchantid: TEST001
+ipaddress: 192.168.1.1
+accessmodetype: SITE
+bank: 607094
+remark: BE
+type: BE
+```
+
+### Response
+```json
+{
+  "status": false,
+  "message": "You do not have permission.,Please onboard merchant",
+  "response_code": 25
+}
+```
+
+### HTTP Status
+```
+200 OK
+```
+
+### Response Time
+```
+1.296259s
+```
+
+### Result
+❌ EXPECTED ERROR - No permission (requires merchant onboarding and real biometric data)
+
+---
+
+## Test 8: Mini Statement API
+
+### Endpoint
+```
+POST /api/v1/aeps/miniStatement
+```
+
+### Request
+```bash
+curl -X POST "https://apidev.excisofttech.com/api/v1/aeps/miniStatement" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "apiKey=kGxc8E68fiU1HYwlImyMGouxlK0MUsqH&mobile=9999999999&latitude=26.9124336&longitude=75.7872709&adhaarnumber=123456789012&bank_pipe=bank3&device=Mantra&pid=test_pid_data&ref_id=TEST123456&submerchantid=TEST001&ipaddress=192.168.1.1&accessmodetype=SITE&bank=607094&remark=MS&type=MS"
+```
+
+### Request Parameters
+```
+apiKey: kGxc8E68fiU1HYwlImyMGouxlK0MUsqH
+mobile: 9999999999
+latitude: 26.9124336
+longitude: 75.7872709
+adhaarnumber: 123456789012
+bank_pipe: bank3
+device: Mantra
+pid: test_pid_data
+ref_id: TEST123456
+submerchantid: TEST001
+ipaddress: 192.168.1.1
+accessmodetype: SITE
+bank: 607094
+remark: MS
+type: MS
+```
+
+### Response
+```json
+{
+  "response_code": 14,
+  "status": false,
+  "message": "You do not have permission.,Please onboard merchant"
+}
+```
+
+### HTTP Status
+```
+200 OK
+```
+
+### Response Time
+```
+0.494014s
+```
+
+### Result
+❌ EXPECTED ERROR - No permission (requires merchant onboarding and real biometric data)
+
+---
+
+## Summary
+
+| API | Endpoint | Status | Result |
+|-----|----------|--------|--------|
+| Bank List | `/api/v1/aeps/get_bank_list` | ✅ SUCCESS | Retrieved 107 banks |
+| Onboarding | `/api/v1/aeps/onboard` | ✅ SUCCESS | URL generated |
+| Onboard Status | `/api/v1/aeps/onboard_status_check` | ⚠️ ERROR | Merchantcode not found |
+| Register | `/api/v1/aeps/register.php` | ⚠️ ERROR | Merchant not onboarded |
+| Merchant Auth | `/api/v1/aeps/merchant_auth` | ⚠️ ERROR | Merchant not onboarded |
+| Withdrawal | `/api/v1/aeps/withdrawal` | ⚠️ ERROR | No permission |
+| Balance Enquiry | `/api/v1/aeps/balanceEnquiry` | ⚠️ ERROR | No permission |
+| Mini Statement | `/api/v1/aeps/miniStatement` | ⚠️ ERROR | No permission |
+
+**Test Date:** August 7, 2026
+**API Key Used:** kGxc8E68fiU1HYwlImyMGouxlK0MUsqH
+**API Connectivity:** ✅ Working
+**API Key Validation:** ✅ Valid
+
+**Note:** Tests 3-8 returned expected errors because they require:
+1. Merchant to complete onboarding process via the redirect URL
+2. Real biometric fingerprint data (PID) from physical device
+3. Actual merchant credentials and approved merchant status

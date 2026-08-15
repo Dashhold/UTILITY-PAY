@@ -43,6 +43,8 @@ export interface CcfConfig {
 export interface Biller {
   /** NBBL biller ID, e.g. "MAHADISCOM00MAH01". */
   id: string
+  /** Numeric operator code for API calls, e.g. "31" for MSEDCL */
+  operatorId?: string
   name: string
   categorySlug: string
   /** Operating region, e.g. "Maharashtra" or "National". */

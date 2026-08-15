@@ -18,8 +18,8 @@
 
 import { api, ApiError } from "@/lib/api"
 import type { Receipt, Transaction } from "@/lib/api-types"
-import { toNumberOrZero } from "@/lib/money"
 import { findBiller } from "./billers"
+import { toNumberOrZero } from "@/lib/money"
 import type { BharatConnectTxn, FetchedBill, PaymentMode, TxnStatus } from "./types"
 
 /** Thrown when a bill fetch fails. Mirrors the mock service's error shape. */
@@ -62,6 +62,15 @@ export async function fetchBillLive(
   billerId: string,
   params: Record<string, string>,
 ): Promise<LiveFetchedBill> {
+  // Get the biller to access its operatorId
+  const biller = findBiller(billerId)
+  if (!biller) {
+    throw new LiveFetchError("Biller not found", "BC-ERR-BILLER-NOT-FOUND")
+  }
+
+  // Use operatorId if available (from API), fallback to id for mock data
+  const operatorId = biller.operatorId ?? biller.id
+
   // The biller declares which input identifies the account; the first non-empty
   // value is the connection number.
   const connection = Object.values(params).find((v) => v && v.trim() !== "")
@@ -72,7 +81,7 @@ export async function fetchBillLive(
   try {
     const bill = await api.bharatConnect.viewBill({
       connection: connection.trim(),
-      operatorId: billerId,
+      operatorId, // Use numeric operatorId from biller
       circleId: params.circleId ?? "",
       adParams: params,
     })
@@ -116,12 +125,21 @@ export interface LivePayRequest {
 
 /** Submits a payment and returns the resulting transaction. */
 export async function payBillLive(req: LivePayRequest): Promise<BharatConnectTxn> {
+  // Get the biller to access its operatorId
+  const biller = findBiller(req.billerId)
+  if (!biller) {
+    throw new LivePaymentError("Biller not found", "BC-ERR-BILLER-NOT-FOUND")
+  }
+
+  // Use operatorId if available (from API), fallback to id for mock data
+  const operatorId = biller.operatorId ?? biller.id
+
   try {
     const receipt = await api.bharatConnect.pay(
       {
         requestRef: req.requestRef,
         connection: req.connection,
-        operatorId: req.billerId,
+        operatorId, // Use numeric operatorId from biller
         amount: req.amount.toFixed(2),
         customerMobile: req.customerMobile,
         remitterName: req.customerName,

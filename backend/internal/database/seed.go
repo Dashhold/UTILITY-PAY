@@ -506,7 +506,7 @@ func seedBillers(db *gorm.DB, _ *slog.Logger) error {
 
 	rows := []models.Biller{
 		{
-			BillerID: "PSPC00000PUN01", Name: "Punjab State Power Corporation Ltd",
+			BillerID: "PSPC00000PUN01", OperatorID: "31", Name: "Punjab State Power Corporation Ltd",
 			Category: "Electricity", Coverage: "Punjab",
 			CustomerParams:    models.JSONMap{"Account Number": map[string]any{"type": "numeric", "minLength": 6, "maxLength": 12}},
 			SupportsBillFetch: true, PartialPayAllowed: false,
@@ -514,7 +514,7 @@ func seedBillers(db *gorm.DB, _ *slog.Logger) error {
 			Status: models.StatusActive,
 		},
 		{
-			BillerID: "MAHA00000MAH01", Name: "Maharashtra State Electricity Distribution",
+			BillerID: "MAHA00000MAH01", OperatorID: "31", Name: "Maharashtra State Electricity Distribution",
 			Category: "Electricity", Coverage: "Maharashtra",
 			CustomerParams:    models.JSONMap{"Consumer Number": map[string]any{"type": "numeric", "minLength": 12, "maxLength": 12}},
 			SupportsBillFetch: true, PartialPayAllowed: false,
@@ -522,7 +522,7 @@ func seedBillers(db *gorm.DB, _ *slog.Logger) error {
 			Status: models.StatusActive,
 		},
 		{
-			BillerID: "INDA00000NAT01", Name: "Indane Gas",
+			BillerID: "INDA00000NAT01", OperatorID: "249", Name: "Indane Gas",
 			Category: "Gas", Coverage: "National",
 			CustomerParams:    models.JSONMap{"Consumer Number": map[string]any{"type": "numeric", "minLength": 8, "maxLength": 16}},
 			SupportsBillFetch: true,
@@ -530,7 +530,7 @@ func seedBillers(db *gorm.DB, _ *slog.Logger) error {
 			Status: models.StatusActive,
 		},
 		{
-			BillerID: "AIRT00000NAT01", Name: "Airtel Postpaid",
+			BillerID: "AIRT00000NAT01", OperatorID: "7", Name: "Airtel Postpaid",
 			Category: "Mobile Postpaid", Coverage: "National",
 			CustomerParams:    models.JSONMap{"Mobile Number": map[string]any{"type": "numeric", "minLength": 10, "maxLength": 10}},
 			SupportsBillFetch: true,
@@ -538,7 +538,7 @@ func seedBillers(db *gorm.DB, _ *slog.Logger) error {
 			Status: models.StatusActive,
 		},
 		{
-			BillerID: "JIOF00000NAT01", Name: "Jio Fiber",
+			BillerID: "JIOF00000NAT01", OperatorID: "7", Name: "Jio Fiber",
 			Category: "Broadband", Coverage: "National",
 			CustomerParams:    models.JSONMap{"Customer ID": map[string]any{"type": "alphanumeric", "minLength": 6, "maxLength": 20}},
 			SupportsBillFetch: true,

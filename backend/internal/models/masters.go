@@ -230,6 +230,12 @@ type Biller struct {
 
 	// BillerID is the NPCI biller identifier, e.g. "MAHA00000MAH01".
 	BillerID string `gorm:"size:60;not null;uniqueIndex" json:"billerId"`
+	
+	// OperatorID is the Bharat Connect numeric operator code sent in API requests.
+	// This is the "op" field value, e.g. "31" for MSEDCL, "7" for Airtel.
+	// CRITICAL: This must be a numeric string, not the alphanumeric BillerID.
+	OperatorID string `gorm:"size:20;not null;index" json:"operatorId"`
+	
 	Name     string `gorm:"size:200;not null;index" json:"name"`
 
 	// Category is the Bharat Connect category, e.g. "Electricity".

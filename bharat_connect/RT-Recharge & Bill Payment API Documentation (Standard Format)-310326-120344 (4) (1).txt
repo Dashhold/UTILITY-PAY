@@ -1,0 +1,2493 @@
+Recharge & Bill Payment API Documentation (Standard Format)
+Version: 1.0
+Audience: External Integration Partners
+Base URL:https://alpha3.mobikwik.com (For testing)
+Partner Dashboard URL : https://<host-name>/partner/index.html#/login (prod hostname
+would be provided after uat sign off)
+Authentication & Token Generation API
+Overview
+This API is used to authenticate the partner using the provided clientId and clientSecret.
+If the credentials are valid, the system generates a token that must be sent in the Authorization
+header for all subsequent API calls.
+
+Important Notes
+A generated token remains valid for 24 hours and there is a daily limit of
+100 tokens.
+If a new token is requested while an existing token is still active, the
+currently active token will expire after 5 minutes due to the token
+rotation policy. A new token will be issued with a fresh 24-hour validity
+period.
+Endpoint
+POST
+https://<host-name>/recharge/v1/verify/retailer
+Headers
+Key
+
+Value
+
+Required
+
+Content-Type
+
+application/json
+
+Yes
+
+Request Body
+1 {
+2
+"clientId": "RCH_7avjk23DutLnwa0r3xzUUqw",
+3
+"clientSecret": "1169rSXQ4Ie5lDaIFXOjAbnCkh6klVkvro_iwRZK5fU"
+4 }
+
+Request Parameters
+Field
+
+Type
+
+Description
+
+Require
+d
+
+clientId
+
+String
+
+Unique ID provided by Mobikwik
+
+Yes
+
+clientSecret
+
+String
+
+Secret key associated with the
+clientId
+
+Yes
+
+Success Response (200)
+1 {
+2
+"success": true,
+3
+"data": {
+4
+"token": "wQltGT9mP1HlXNHq0ZrdK-GhwdnHnIXs7mw33S8xTrI",
+5
+"expiryTime": "2025-10-29 12:26:53"
+6
+}
+7 }
+
+Field Details
+Field
+
+Type
+
+Description
+
+success
+
+Boolean
+
+Indicates success of the request
+
+data.token
+
+String
+
+Token to be used in the
+Authorization header
+
+data.expiryTime
+
+String (YYYYMM-DD
+HH:mm:ss)
+
+Token expiration timestamp
+
+Failure Response
+1 {
+2
+"success": false,
+3
+"message": {
+4
+"code": "1308",
+5
+"text": "Invalid Request"
+6
+}
+7 }
+
+Failure Codes
+Code
+
+Meaning
+
+1308
+
+credentials are wrong.
+
+500
+
+Invalid request / system error
+
+How to Use the Token
+Include the token in all API calls as:
+Authorization: <token>
+Sample Eg:
+HTTP Request Header :
+Authorization: wQltGT9mP1HlXNHq0ZrdK-FhwdnHnIXs7mw33S8xTrI
+Plan Fetching API
+Overview
+The Plan Fetching API allows partners to retrieve available recharge plans based on operator,
+circle, and optional plan type.
+Fetch All Plans for an Operator & Circle
+Endpoint
+GET
+https://<host-name>/recharge/v1/rechargePlansAPI/<opId>/<cirId>/
+
+Example : (https://<host-name>/recharge/v1/rechargePlansAPI/1/1)
+Headers
+Key
+
+Value
+
+Required
+
+Content-Type
+
+application/json
+
+Yes
+
+X-MClient
+
+14
+
+Yes
+
+Path Parameters
+
+Parameter
+
+Description
+
+Required
+
+opId
+
+Operator ID
+
+Yes
+
+cirId
+
+Circle ID
+
+Yes
+
+Success Response (200)
+1 {
+2
+"success": true,
+3
+"data": {
+4
+"plans": [
+5
+{
+6
+"id": "1277272",
+7
+"operatorId": 1,
+8
+"circleId": 1,
+9
+"planType": 17,
+10
+"planTab": null,
+11
+"planCode": "airtel-Andhra-Pradesh-local-plans-Rs-155.0",
+12
+"amount": 155.0,
+13
+"talktime": 0.0,
+14
+"validity": "24 days",
+15
+"planName": "Voice + 4G Data",
+16
+"planDescription": "Enjoy TRULY unlimited Local, STD &
+Roaming calls on any network, 1 GB data, 300 National SMS for 24
+days",
+17
+"dataBenefit": "1 GB",
+18
+"isPopular": 0,
+19
+"isPromoted": 0,
+20
+"isHidden": 0,
+21
+"stringTalktime": null,
+22
+"special": true,
+23
+"validityInDays": 24,
+24
+"languageRegion": [
+25
+""
+26
+],
+27
+"type": [
+28
+""
+29
+],
+30
+"planTypeForWeb": 17,
+31
+"planDetailItemList": [
+32
+{
+33
+"key": "talktime",
+34
+"displayName": "Talktime",
+35
+"displayValue": "-"
+36
+},
+37
+{
+38
+"key": "validity",
+39
+"displayName": "Validity",
+40
+"displayValue": "24 days"
+41
+},
+42
+{
+43
+"key": "data",
+44
+"displayName": "Data",
+45
+"displayValue": "1 GB"
+46
+}
+47
+],
+48
+"planTypeList": [
+49
+1,
+50
+17
+51
+],
+52
+"updatedOn": 1701973800000,
+
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+
+"specialTag": "NEW PLAN",
+"specialTagBgColor": "#FF7B00",
+"planBenefitItemList": [
+{
+"logoUrl":
+"https://static.mobikwik.com/planbenefit_hellotunes.png",
+"displayName": "Free Hellotunes"
+},
+{
+"logoUrl":
+"https://static.mobikwik.com/planbenefit_wynk.png",
+"displayName": "Wynk Music Free"
+}
+]
+}
+]
+}
+}
+
+Failure Response
+For invalid circle/operator combinations:
+1 {
+2
+"success": false,
+3
+"message": {
+4
+"code": "103",
+5
+"text": "Recharge plans not available for the specified operator,
+circle."
+6
+}
+7 }
+
+Fetch Plans by Plan Type
+Overview
+API to fetch plan by plan type
+Endpoint
+GET
+https://<host-name>/recharge/v1/rechargePlansAPI/<opId>/<cirId>/<planType>
+Example:
+https://<host-name>/recharge/v1/rechargePlansAPI/1/1/3
+This returns only planType = 3 (Topup) plans for Airtel (1), AP (1).
+Success Response (Filtered by Plan Type)
+1 {
+2
+"success": true,
+3
+"data": {
+4
+"plans": [
+5
+{
+
+6
+"id": "1008583",
+7
+"operatorId": 1,
+8
+"circleId": 1,
+9
+"planType": 3,
+10
+"planCode": "airtel-Andhra-Pradesh-topup-plans-Rs-10.0",
+11
+"amount": 10.0,
+12
+"talktime": 7.47,
+13
+"validity": "NA days",
+14
+"planName": "Voice Tariff",
+15
+"planDescription": "Talktime of Rs. 7.47",
+16
+"stringTalktime": "7.47",
+17
+"validityInDays": -1,
+18
+"updatedOn": 1575225000000
+19
+}
+20
+// More plans...
+21
+],
+22
+"plansToRecommend": []
+23
+}
+24 }
+
+Plan Type Categorisation
+These are the possible planType values returned in the API response and usable when filtering
+plans by type.
+planType
+
+Description
+
+1
+
+All Plans
+
+2
+
+Full Talktime
+
+3
+
+Topup
+
+4
+
+Validity Recharge
+
+5
+
+Local SMS Pack
+
+6
+
+SMS
+
+7
+
+General SMS Pack
+
+8
+
+3G
+
+9
+
+Data
+
+10
+
+Lifetime Validity
+
+11
+
+Night Packs
+
+12
+
+Unlimited Talktime
+
+13
+
+Local Call
+
+14
+
+STD
+
+15
+
+ISD
+
+16
+
+Rate Cutter
+
+17
+
+Special Offer
+
+18
+
+4G
+
+19
+
+Monthly
+
+20
+
+3 Month
+
+21
+
+6 Month
+
+22
+
+Annual
+
+23
+
+Channel
+
+24
+
+Popular
+
+30
+
+121 Made For You
+
+31
+
+Best Offers
+
+41
+
+Jio Phone
+
+42
+
+Smart Phone
+
+43
+
+MNP
+
+45
+
+Data Addon
+
+46
+
+International Roaming
+
+47
+
+JIO CRICKET PLANS
+
+48
+
+Popular (For JIO)
+
+Notes
+Please test plan availability for Airtel, Jio, BSNL in staging.
+Circle List :
+
+Circle ID
+
+Circle Name
+
+1
+
+Andhra Pradesh
+
+2
+
+Assam
+
+3
+
+Bihar & Jharkhand
+
+4
+
+Chennai
+
+5
+
+Delhi & NCR
+
+6
+
+Gujarat
+
+7
+
+Haryana
+
+8
+
+Himachal Pradesh
+
+9
+
+Jammu & Kashmir
+
+10
+
+Karnataka
+
+11
+
+Kerala
+
+12
+
+Kolkata
+
+13
+
+Maharashtra & Goa (except Mumbai)
+
+14
+
+MP & Chattisgarh
+
+15
+
+Mumbai
+
+16
+
+North East
+
+17
+
+Orissa
+
+18
+
+Punjab
+
+19
+
+Rajasthan
+
+20
+
+Tamilnadu
+
+21
+
+UP(EAST)
+
+22
+
+UP(WEST) & Uttarakhand
+
+23
+
+West Bengal
+
+1.Steps for Encryption :
+Encryption Protocol Overview
+For all APIs mentioned below, use Hybrid Encryption combining asymmetric and symmetric
+cryptography:
+/v3/retailerViewbill
+/v3/retailerValidation
+/v3/retailerBalance
+/v3/retailerPayment
+/v3/retailerStatus
+RSA-2048 bits: For session key exchange (this will be provided by mobikwik over mail
+subject : MobiKwik API - Your Public Key for Secure Integration)
+You have to extract this public key from the pem file and use this key to encrypt your AES
+session key .
+AES-256-GCM: For payload encryption
+
+Request Structure
+
+Above API call must include an encryptedPayload in the following format.
+
+Sample Encrypted JSON Payload :
+1 {
+2
+"encryptedSessionKey": "<Base64_Encoded_String>"
+3
+"encryptedPayload": "<Base64_Encoded_String>",
+4
+"keyVersion": "1.0",
+5
+"iv": "<Base64_Encoded_String>"
+6 }
+
+Step 1.1: Generate AES Session Key
+
+Generate a random 256-bit AES session key.
+sessionKey = AES-256 random key
+256-bit key
+
+Step 1.2: Encrypt JSON Payload
+
+Encrypt the actual API payload using the AES session key.
+Use a random 16-byte IV (Initialization Vector).
+Output the encrypted payload bytes, then Base64-encode them.
+encryptedPayload = Base64( AES-256-GCM(payload, sessionKey, IV) )
+Step 1.3: Encrypt Session Key with RSA
+
+Encrypt the AES session key using RSA-2048 Public Key shared by MobiKwik (via email).
+Use PKCS1Padding padding.
+Output the encrypted session key bytes, then Base64-encode them.
+encryptedSessionKey = Base64( RSA-2048(sessionKey, MobikwikPublicKey) )
+Step 1.4: Encode Initialization Vector
+
+Base64-encode the 16-byte IV used in AES encryption.
+iv = Base64(IV)
+Step 1.5: Add Metadata
+
+Include the following metadata fields in the request:
+keyVersion → provided by MobiKwik in readme.txt file in mail subject : MobiKwik API - Your
+Public Key for Secure Integration
+Step 1.6: Send to API Endpoint
+
+Send the final encrypted request payload (as JSON) to the respective API endpoint.
+Parameter
+
+Value
+
+Description
+
+Session Key
+Algorithm
+
+AES-256-GCM
+
+Symmetric encryption
+
+Session Key Size
+
+256 bits (32 bytes)
+
+Key length
+
+IV Size
+
+16 bytes
+
+Initialization vector
+
+GCM Tag Size
+
+128 bits
+
+Authentication tag
+
+RSA Key Size
+
+2048 bits
+
+Asymmetric encryption
+
+RSA Padding
+
+PKCS1Padding
+
+Padding scheme
+
+Encoding
+
+Base64
+
+All binary data
+encoding
+
+Sample Code :
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+
+ObjectMapper mapper = new ObjectMapper();
+String jsonPayload = mapper.writeValueAsString(payload);
+// 2. Generate random AES session key (256-bit)
+KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+keyGen.init(256, new SecureRandom());
+SecretKey sessionKey = keyGen.generateKey();
+// 3. Generate random IV (16 bytes)
+byte[] iv = new byte[16];
+SecureRandom random = new SecureRandom();
+random.nextBytes(iv);
+//4. Encrypt json payload
+GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
+Cipher aesCipher = Cipher.getInstance("AES/GCM/NoPadding");
+aesCipher.init(Cipher.ENCRYPT_MODE, sessionKey, gcmSpec);
+byte[] encryptedPayload = aesCipher.doFinal(
+jsonPayload.getBytes(StandardCharsets.UTF_8)
+);
+// 5. Load RSA public key here publicKeyBase64 is key received
+in email by //mobikwik
+byte[] publicKeyBytes =
+Base64.getDecoder().decode(publicKeyBase64);
+X509EncodedKeySpec keySpec = new
+X509EncodedKeySpec(publicKeyBytes);
+KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+PublicKey publicKey = keyFactory.generatePublic(keySpec);
+// 6. Encrypt session key with RSA
+Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+rsaCipher.init(Cipher.ENCRYPT_MODE, publicKey);
+byte[] encryptedSessionKey =
+rsaCipher.doFinal(sessionKey.getEncoded());
+
+// 7. Build encrypted request
+EncryptedRequest request = new EncryptedRequest();
+request.encryptedSessionKey =
+Base64.getEncoder().encodeToString(encryptedSessionKey);
+36
+request.encryptedPayload =
+Base64.getEncoder().encodeToString(encryptedPayload);
+37
+38
+request.iv = Base64.getEncoder().encodeToString(iv);
+39
+request.keyVersion = keyVersion;
+40
+request.timestamp = String.valueOf(System.currentTimeMillis());
+41
+
+Balance Check API
+Overview
+Use this API to fetch the current wallet balance of a retailer.
+
+Endpoint
+POST
+https://<host-name>/recharge/v3/retailerBalance
+Headers
+Key
+
+Value
+
+Content-Type
+
+application/json
+
+Authorization
+
+{token generated from Authentication API}
+
+Request Parameters
+Field
+
+Description
+
+Mandatory
+
+memberId
+
+Member ID of
+Yes
+the retailer
+account(Onboar
+ded email id)
+
+Type
+String
+
+Sample JSON (Plain Text which needs to encrypted before sending in request)
+1 {
+2
+"memberId": "testalpha1@gmail.com"
+3 }
+
+Sample Request (Encrypted Request)
+1 {
+2
+"encryptedSessionKey":
+"M8SJTP/d81pftW3cjTcT5CsAPtOHlS+CLYrNet+T3LYGDYn/rnWNd0zZawIW5/CuOQpIYO
+h1XjUjnSqZWMdtIh23eiTybLid05qgqYFPecIFJPhd2pDkJX0UOEyR6MaQXZ3zgONhuHkrM
+sfk6DlA4T/2kLsY+fO2jRLGATT3ZqGK6ohcE5pZMwrmwME3nI0/8F9TlPECjl3cMgiUnH3K
+wCTS0QLJP17VTLvnZqingQ44hcHZF938rPf3rz9s+2x/OV44Rwm8Us2VxG/Q2XtcQI2UESu
+dLfFDJuqgijI2DFw2gl1VeLEZeBlVnkUNOAWr4mp1bbJWdghT4597UPT8gg==",
+3
+"encryptedPayload":
+"sI5m6gHd1xWVW0LKyA+FgoEnH419SiDq9ku07q1N5J/6S64IgGkRYMBXb8zSSkA0LEOCKD
+1qkdEA21WK0EOcE16WBBVA4nCnRGSRn8gJJ8HfDGxX7NTmyV0DIAAHtjru",
+4
+"keyVersion": "1.0",
+5
+"iv": "D1KIVJlHivVSImIb"
+6 }
+7
+8
+
+Success Response
+1 {
+2
+"success": true,
+
+3
+"data": {
+4
+"balance": 303.5
+5
+}
+6 }
+
+Failure Response
+1 {
+2
+"success": false,
+3
+"message": {
+4
+"code": "401",
+5
+"text": "Token is expired/Invalid Token/Token not found in
+request"
+6
+}
+7 }
+
+Code
+
+Meaning
+
+401
+
+Token is expired/Invalid
+Token/Token not found in request
+
+900
+
+Error processing encrypted request:
+Invalid request
+
+Notes
+Authorization token must be obtained from the Authentication API.
+The request body must be encrypted as per Mobikwik encryption standards.
+To complete the transaction, the API calls must be executed in the following order.
+API Execution Order :
+
+For Prepaid Recharge :
+1. Validation (v3/retailerValidation)
+2. Payment (v3/retailerPayment)
+3. Status check (v3/retailerStatus)
+
+For Postpaid Bill Payment
+1. View Bill (v3/retailerViewBill)
+2. Payment (v3/retailerPayment)
+3. Status check (v3/retailerStatus)
+
+NOTE : For production system a separate Operator file with all details for additional params,
+paymodes, regex would be shared after UAT sign off
+Validation API
+Overview
+Used to Validate details (amount, operator, circle) for a connection.
+Endpoint
+POST
+https://<host-name>/recharge/v3/retailerValidation
+Headers
+Key
+
+Value
+
+Content-Type
+
+application/json
+
+Authorization
+
+{token generated from Authentication API}
+
+Request Parameters
+Field
+
+Description
+
+Type
+
+Mandator
+y
+
+amt
+
+Amount
+
+String
+
+Yes
+
+cn
+
+Connection number
+
+String
+
+Yes
+
+op
+
+Operator ID
+
+String
+
+Yes
+
+adParams
+
+Additional parameters (empty map JSON
+if none)
+Map
+
+Condition
+al
+
+cir
+
+Circle ID
+
+String
+
+Optional
+
+agentId
+
+AgentId
+
+String
+
+Yes
+
+planCode
+
+Plan Code
+
+String
+
+Yes(Condi
+tional)
+
+Sample json Request
+Validation Success Request (Plain Text which needs to encrypted before sending in request)
+:
+1 {
+2
+3
+4
+5
+6
+7
+8
+9 }
+
+"amt": "100",
+"cn": "9876876768",
+"op": "7",
+"cir": "1",
+"agentId": "MK01MK01INB523643654",
+"planCode": "bsnl-Andhra-Pradesh-topup-plans-Rs-100.0",
+"adParams": {}
+
+Validation Failure Request (Plain Text which needs to encrypted before sending in request) :
+1 {
+2
+3
+4
+5
+6
+7
+8
+9 }
+
+"amt": "10",
+"cn": "8434625057",
+"op": "140",
+"cir": "22",
+"agentId": "MK01MK01INB523643654",
+"planCode": "Vi-UP-WEST-Uttarakhand-121-made-for-you-Rs-1.0",
+"adParams": {}
+
+Sample Request (Encrypted)
+1 {
+2
+"encryptedSessionKey":
+"DO/Fdag28ZVA/8splzD12rjcTtXlO6Z/qbWMY9YpE/d82Ds61xg/AVFwBCUnnH/sAFYoFw
+jLgpMYYzZJKKU1DoRT9YXVdgSsgET6KbcoMIKmBy6kO7TaLe4mB5zgg9HI+LGrtiROjOYYD
+r386cBfxyRX8/mmw39OfVw4Lma53RkTb94acrNxn+y7/uWWIjjAag78nXcTvU7O3wyxiGVT
++uXZjNMrIqVnSRYrkuQR2PL3t2zuNyCasXl5JDr1yvQpTw7pYvP2lNTYhuaH/6ou6dOEFxN
+SBipXJWsCId5SS5gmg6EphdBgkg29iIvj9EN2mrAKNplSzFf/Wr0LylpJLA==",
+
+3
+
+"encryptedPayload":
+"6lxUZUX6xvP1S7+P0lOJm/uerCEf15v5DvoUcTTng95Keijv6TiNTbxp1SKRnorMJAjE5b
+PyQB7o4T7s9st3eRHeZXP/i7g4UNS1RMz4WAahrSV6qQAAN1/vYi+H5kYm3oWrXQEZNsgi3
+qeSHJ7OgS2L6t6n/zVeunFklK/PbXf5lY7NkXQ04CSbhdQ=",
+4
+"iv": "6cCRbQ0el6JGHXMy",
+5
+"keyVersion": "1.0"
+6 }
+
+Validation Success Response :
+1 {
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19 }
+
+"success": true,
+"data": {
+"status": "RECHARGEVALIDATIONSUCCESS",
+"description": "",
+"balance": 0.0,
+"discountedPrice": 0.0,
+"walletAmount": 0.0,
+"pgAmount": 0.0,
+"superCashBurned": 0.0,
+"zipBalanceUsed": 0.0,
+"autoPaySupported": false,
+"spinTheWheelApplied": false,
+"rewardWidgetEnabled": false,
+"scratchCardEnabled": false,
+"callForHelpEnabled": false,
+"businessError": false
+}
+
+Validation Failure Response :
+1 {
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23 }
+
+View Bill API
+
+"success": false,
+"message": {
+"code": "RECHARGEVALIDATIONFAILURE",
+"text": "Invalid Hash Value"
+},
+"data": {
+"status": "RECHARGEVALIDATIONFAILURE",
+"description": "Invalid Hash Value",
+"balance": 0.0,
+"discountedPrice": 0.0,
+"walletAmount": 0.0,
+"pgAmount": 0.0,
+"superCashBurned": 0.0,
+"zipBalanceUsed": 0.0,
+"autoPaySupported": false,
+"spinTheWheelApplied": false,
+"rewardWidgetEnabled": false,
+"scratchCardEnabled": false,
+"callForHelpEnabled": false,
+"businessError": true
+}
+
+Overview
+Used to fetch bill details (bill amount, due date, etc.) for a connection.
+Endpoint
+POST
+https://<host-name>/recharge/v3/retailerViewbill
+Headers
+Key
+
+Value
+
+Content-Type
+
+application/json
+
+Authorization
+
+{token generated from Authentication API}
+
+Request Parameters
+Field
+
+Description
+
+Type
+
+Mandator
+y
+
+cn
+
+Connection number
+
+String
+
+Yes
+
+op
+
+Operator ID
+
+String
+
+Yes
+
+cir
+
+Circle ID
+
+String
+
+Yes
+
+agentId
+
+AgentId
+
+String
+
+Yes
+
+adParams
+
+Additional parameters (empty map JSON
+if none)
+Map
+
+Condition
+al
+
+ViewBill Success Request (Plain Text which needs to encrypted before sending in request) :
+
+1 View bill Success Sample:
+2 {"cn":"80003948751","op":"249","cir":"1","adParams":{}}
+1 View bill Failure Sample:
+2 {"cn":"80003948751","op":"29","cir":"1","adParams":{}}
+1 View bill Success Sample:
+2 {
+3
+"cn": "151608882",
+4
+"op": "31",
+5
+"cir": "",
+
+6
+7
+8 }
+
+"agentId": "MK01MK01INB523643654",
+"adParams": {}
+
+Sample Request (Encrypted)
+1 {
+2
+"encryptedSessionKey":
+"ZMEL/3nznL0hwi0ZTn0UCHGIcvxlQ4NDnTwCnyF1aUUaJrmGE3I38vI+c3XC70ylM+fCPA
+wbuE5XnaqYwwD9RNzzgqVuCg5L6LrrOZpqt3azAONyoyVIOxk0iR33ip8mNEjpnCtqs9X+p
+8vW3KV/kYSnA69yHhQq5EEu9MX7hfVRXLtW3LlnNpuyztGFP+VGT6NNq5PhJErpgWZ+MCVf
+mvdoXB+rtTO6XT1S5BDfQSZPZkVLOjIfPlmzG6iF40Bw/Qvkcclho4GV1AW4fgbQ55vI05E
+qLOxrNFzPilhK+/I8qbNtzkDJGwg3PWGoTADZiKshuQ/37wsSb3TfMEVuVQ==",
+3
+"encryptedPayload":
+"f03huWmVARKrET/O53xypX8ckkKkk7igeL8Gi7qLORoYPGko0x5RMY4sCKNw3167XWdRUD
+8Ya7hEH7z2q26MGjGYFQ==",
+4
+"iv": "BtIKfTiogiFytzfL",
+5
+"keyVersion": "1.0"
+6 }
+
+Success Response
+1 {
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14 }
+
+"success": true,
+"data": [
+{
+"billAmount": "1930.0",
+"billnetamount": "1930.0",
+"billdate": "24-Nov-2025",
+"dueDate": "15-Dec-2025",
+"acceptPayment": true,
+"acceptPartPay": false,
+"userName": "***** **** Ma***"
+}
+]
+
+Response Parameter Details
+Field
+
+Description
+
+billAmount
+
+Total payable bill amount
+
+billnetamount
+
+Final amount (may differ for some operators)
+
+billdate
+
+Bill generation date
+
+dueDate
+
+Bill due date
+
+acceptPayment
+
+Whether biller accepts payment
+
+acceptPartPay
+
+Whether partial payment is allowed
+
+userName
+
+Customer name (optional)
+
+Recharge API
+Overview
+Main API for initiating prepaid recharge or bill payment transactions.
+Endpoint
+POST
+https://<host-name>/recharge/v3/retailerPayment
+Headers
+Key
+
+Value
+
+Content-Type
+
+application/json
+
+Authorization
+
+Token from Authentication API
+
+Request Parameters
+Field
+
+Description
+
+Type
+
+Mandatory
+
+cn
+
+Connection
+number
+
+String
+
+Yes
+
+op
+
+Operator ID
+
+String
+
+Yes
+
+cir
+
+Circle ID
+
+String
+
+Yes
+
+amt
+
+Recharge
+amount
+
+String
+
+Yes
+
+reqid
+
+Unique
+String
+transaction
+request ID (20
+digits)
+Please add some
+unique identifier
+at the beginning
+of this string.
+
+Yes
+
+customerMobile
+
+Customer’s
+mobile number
+
+String
+
+Yes
+
+remitterName
+
+Customer name
+
+String
+
+Yes
+
+paymentRefID
+
+Unique payment String
+reference
+ID(Structure
+depends on
+paymode)
+
+Yes
+
+paymentMode
+
+Possible values String
+(Depending on
+Operator): Cash,
+Credit Card,
+Debit Card,
+Internet Banking,
+UPI, Wallet
+
+Yes
+
+agentId
+
+AgentId
+
+String
+
+Yes
+
+paymentAccount UPI ID/account
+Info
+details
+
+String
+
+Yes
+
+ad1
+
+Additional
+parameter
+
+String
+
+Optional
+
+ad2
+
+Additional
+parameter
+
+String
+
+Optional
+
+Paymode
+
+paymentAccountInfo
+
+Cash
+
+Cash Payment
+
+Credit Card
+
+paymentRefID
+
+Debit Card
+
+paymentRefID
+
+Internet Banking
+
+paymentRefID
+
+UPI
+
+Sample:- vpa@icici
+
+Wallet
+
+Linked Mobile Number
+
+Recharge Success Request (Plain Text which needs to encrypted before sending in request)
+:
+1 {
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14 }
+
+"cn": "9876543210",
+"op": "7",
+"cir": "",
+"amt": "10",
+"reqid": "tessjdk103",
+"remitterName": "P****na T****g",
+"customerMobile" : "9999999999",
+"paymentRefID": "NX231107767681728991",
+"paymentMode": "UPI",
+"agentId": "MK01MK01INB523643654",
+"paymentAccountInfo": "1234567890@ybl",
+"customerMobile": "99xxxxxxxx"
+
+Sample Request (Encrypted)
+1 {
+2
+"encryptedSessionKey":
+"az/eF0sHxpa6mRVWJq0+/tlE92pOVi75YZtZVHmp2E19ijyzNVUVcBn1xWswyxp5aOrSfi
+quPV+a6TjPJHaTUVJtp83uVI8poAAfphdZj+wukmbNz/ej7v4dPsMy1W3n+RHg/kDq+FqHC
+oqF0lIlnFP8aaIcDkVq2bqGsrnHrQcJFlzoVp/MEsj9Zl96WBx26vnCCOjmPQuocAqIm3CG
+AtaelU89d4V3ebfDSG9R+ofadFqeLe8jY8HGYOYv0dxhWviY4QdB4lT3V05wIr2RiewEi1f
+UHBE8Bpkk6s8GvEH4Rw/7oZ0yYztCaK1EEly+8Bwj85AYAtS83wGc1pX9jg==",
+3
+"encryptedPayload":
+"Soq2h5Aw4lk7SnQpHWeP/hFDgBA9GNRwrUAUnLSDLwGW6/iBmjQoXQ3wulNeAtqa5/qm6l
+cqHB+7VbGhH67WXZDc26FD3VBTDxsWh4ym29gGC9lMj0B6mbOE8Y/Q90nThMDISzVlZkHAD
+VnsippvxvTWimK1a5sI5Zmbacg88yAunUTebZyC/yLoAz2O75wyiSGEhr1uM569weeBos83
+B7J71UG+eX52Kr0y2JCbiJZcagQJaGbXvEcpeKZOJkQpg3dKxqJIb2u8CDnPkmNWWNfJb6N
+3",
+4
+"iv": "TsN9z/2deTUE32Aa",
+5
+"keyVersion": "1.0"
+6 }
+
+Success Response
+1 {
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13 }
+
+"success": true,
+"data": {
+"status": "SUCCESS",
+"txId": "223407623",
+"balance": 200000.0,
+"couponstatus": "null",
+"mobikwikstamp": "MBK766722936",
+"opRefNo": "null",
+"googleVoucherCode": "null",
+"discountprice": 10.0
+}
+
+Failure Response
+1 {
+2
+"success": false,
+3
+"message": {
+4
+"code": "500",
+5
+"text": "Sorry! The transaction couldn’t succeed"
+6
+}
+
+7 }
+
+For failed bill payment case - Use the below sample connection no:
+NOTE : For UAT Purpose
+1 {
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14 }
+
+"cn": "7797833489",
+"op": "19",
+"cir": "",
+"amt": "200",
+"reqid": "testshkdfcj9168", (Unique Reqid upto 20 characters)
+"remitterName": "<>",
+"paymentRefID": "xxxx",
+"paymentMode": "xxxx",
+"agentId": "MK01MK01INB523643654",
+"paymentAccountInfo": "xxxx@ybl",
+"customerMobile": "99xxxxxxxx"
+
+Response:
+1 {
+2
+3
+4
+5
+6
+7 }
+
+"success": false,
+"message": {
+"code": "500",
+"text": "Something went wrong. Please try again later."
+}
+
+If you get the above mentioned response, kindly perform a status check for the same.
+Refer: Transaction Status Check API
+Example sample payload:
+1 {
+2
+"txId":"tessjdk103"
+3 }
+
+Response:
+1 {
+2
+3
+4
+5
+6
+
+"success": false,
+"message": {
+"code": "500",
+"text": "Invalid transaction ID!"
+}
+
+7 }
+
+If the above response is obtained in the status check call and the amount was debited, you can
+mark the transaction as failed.
+For the status check of failed case, we can solutionize around the point where we will mark a
+successful txn as failed at our end, you can make a status check call after that, in which you will
+get the below response:
+1 {
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16 }
+
+"success": true,
+"data": {
+"txStatus": "RECHARGEFAILURE",
+"mobikwikrefno": "Init",
+"rechargeRetailAmount": 10.000,
+"statusDetails": "Recharge Failed",
+"discountprice": 10.000,
+"mobikwikstamp": "BSS766722892",
+"circlename": "All Circles",
+"cellNumber": "9459738434",
+"txDate": 1765874412000,
+"operatorrefno": null,
+"operatorname": "bsnl"
+}
+
+For pending bill payment case - Use the below sample connection no:
+
+1 {
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14 }
+
+"cn": "9459738434",
+"op": "3",
+"cir": "",
+"amt": "200",
+"reqid": "testshkdfcj9168", (Unique Reqid upto 20 characters)
+"remitterName": "<>",
+"paymentRefID": "xxxx",
+"paymentMode": "xxxx",
+"agentId": "MK01MK01INB523643654",
+"paymentAccountInfo": "xxxx@ybl",
+"customerMobile": "99xxxxxxxx"
+
+Pending Response
+1 {
+2
+"success": true,
+3
+"data": {
+4
+"status": "SUCCESSPENDING",
+5
+"txId": "xxxxxxxxx",
+6
+"balance": 299.5,
+7
+"couponstatus": "null",
+8
+"mobikwikstamp": "xxxxxxxxxxx",
+9
+"opRefNo": "null",
+
+10
+"googleVoucherCode": "null",
+11
+"discountprice": 10.0
+12
+}
+13 }
+
+Status Values
+Status
+
+Meaning
+
+SUCCESS
+
+Transaction completed
+
+SUCCESSPENDING
+
+Pending confirmation from operator
+
+RECHARGEFAILURE
+
+Transaction failed
+
+Transaction Status Check API
+Description
+Checks the status of a previously initiated recharge/bill payment.
+Endpoint
+POST
+https://<host-name>/recharge/v3/retailerStatus
+Headers
+Key
+
+Value
+
+Content-Type
+
+application/json
+
+Authorization
+
+Token from Authentication API
+
+Request Body
+Field
+
+Description
+
+Type
+
+Mandatory
+
+txId
+
+Transaction ID (same as
+reqid in recharge API or
+mobikwikstamp)
+
+String
+
+Yes
+
+Sample Request (Decrypted)
+1 {
+2
+"txId": "863065445721724_test10"
+
+3 }
+
+Sample Request (Encrypted)
+1 {
+2
+"encryptedSessionKey": "...",
+3
+"encryptedPayload": "...",
+4
+"keyVersion": "2.0",
+5
+"iv": "..."
+6 }
+
+Success Response
+1 {
+2
+"success": true,
+3
+"data": {
+4
+"txId": "xxxxxxxxxxxx",
+5
+"status": "RECHARGESUCCESS",
+6
+"description": "Recharge Successful",
+7
+"discountedPrice": 100.0,
+8
+"balance": 99999900.0,
+9
+"operatorRefNo": "xxxxxxxxxxx",
+10
+"mobikwikStamp": "xxxxxxxxx"
+11
+}
+12 }
+13
+14
+
+Pending Response
+1 {
+2
+"success": true,
+3
+"data": {
+4
+"txId": "xxxxxxxxxxx",
+5
+"status": "RECHARGESUCCESSPENDING",
+6
+"description": "Recharge Initiated",
+7
+"discountedPrice": 100.0,
+8
+"balance": 99999900.0,
+9
+"operatorRefNo": null,
+10
+"mobikwikStamp": "xxxxxxxxxxx"
+11
+}
+12 }
+
+Failed Response
+1 {
+2
+"success": true,
+3
+"data": {
+4
+"txId": "xxxxxxxxxxx",
+5
+"status": "RECHARGEFAILURE",
+6
+"description": "Recharge Failed",
+7
+"discountedPrice": 0.0,
+8
+"balance": 100000000.0,
+9
+"operatorRefNo": null,
+10
+"mobikwikStamp": "xxxxxxxxxxx"
+11
+}
+12
+13
+
+}
+
+Failure Response
+1 {
+2
+"success": false,
+3
+"message": {
+4
+"code": "E500",
+5
+"text": "Internal error"
+6
+}
+7 }
+
+Final Notes
+Status must be rechecked when:
+Pending response received
+Any exception response (gateway timeout)
+“Sorry! The transaction couldn’t succeed” is returned
+Additional params may vary across billers.
+Credit card bill fetch API
+Description
+Fetch bill for credit card
+Endpoint
+POST
+https://<host-name>/recharge/v3/retailerCCBill
+Headers
+Key
+
+Value
+
+Content-Type
+
+application/json
+
+Authorization
+
+Token from Authentication API
+
+Request Parameters
+Field
+
+Description
+
+Type
+
+Mandatory
+
+last4
+
+Last 4 digits of
+credit card
+
+String
+
+Yes
+
+mobile
+
+mobile number
+linked to card
+
+String
+
+Yes
+
+agentId
+
+AgentId
+
+String
+
+Yes
+
+bankCode
+
+bank code of the String
+bank as provided
+by mobikwik
+
+Yes
+
+Sample Request (Decrypted)
+1 {
+2
+"last4": "4357",
+3
+"mobile": "7865789567",
+4
+"agentId": "MK01MK01INB523643654",
+5
+"bankCode": "HDFC"
+6 }
+
+Sample Request (Encrypted)
+1 {
+2
+"encryptedSessionKey": "...",
+3
+"encryptedPayload": "...",
+4
+"keyVersion": "2.0",
+5
+"iv": "..."
+6 }
+
+Success Response
+1 {
+2
+3
+4
+5
+6
+7
+8
+9 }
+
+"success": true,
+"data": {
+"statementDate": "2025-10-02",
+"dueDate": "2025-10-25",
+"dueAmount": 2500.0,
+"minimumAmountDue": 100.0
+}
+
+Failure Response
+1 {
+2
+3
+4
+5
+6
+7 }
+
+"success": false,
+"message": {
+"code": "1308",
+"text": "Invalid request"
+}
+
+Credit card bill payment API
+
+Overview
+The api for payment is same for credit card bill payment as that of other bill payment, but there
+is a difference in parameters.
+Endpoint
+POST
+https://<host-name>/recharge/v3/retailerPayment
+Headers
+Key
+
+Value
+
+Content-Type
+
+application/json
+
+Authorization
+
+Token from Authentication API
+
+Request Parameters
+Field
+
+Description
+
+Type
+
+Mandatory
+
+cn
+
+last 4 digits of
+credit card
+
+String
+
+Yes
+
+op
+
+Op will always be String
+208 in case of
+credit card bill
+payment
+
+Yes
+
+amt
+
+Recharge
+amount
+
+String
+
+Yes
+
+reqid
+
+Unique
+String
+transaction
+request ID (20
+digits)
+Please add some
+unique identifier
+at the beginning
+of this string.
+
+Yes
+
+customerMobile
+
+Customer’s
+mobile number
+
+Yes
+
+String
+
+agentId
+
+AgentId
+
+String
+
+Yes
+
+remitterName
+
+Customer name
+
+String
+
+Yes
+
+paymentRefID
+
+Unique payment String
+reference
+ID(Structure
+depends on
+paymode)
+
+Yes
+
+paymentMode
+
+Possible values String
+(Depending on
+Operator): Cash,
+Debit Card,
+Internet Banking,
+UPI
+
+Yes
+
+paymentAccount UPI ID/account
+Info
+details
+
+String
+
+Yes
+
+ad9
+
+Mobile number
+linked to credit
+card
+
+String
+
+Yes
+
+ad3
+
+Bank code
+provided by
+mobikwik
+
+String
+
+Yes
+
+Note that wallet as pay mode is not supported in credit card transaction
+Recharge Request (Plain Text which needs to encrypted before sending in request) :
+1 {
+2
+"cn": "<last 4 of Credit card>",
+3
+"op": "208",
+4
+"amt": "10000",
+5
+"customerMobile": "6735489372",
+6
+"agentId": "MK01MK01INB523643654",
+7
+"reqid": "request_id",
+8
+"ad9": "6735489372",
+9
+"ad3": "HDFC",
+10
+"remitterName": "abc",
+11
+"paymentRefID": "NX23110716084301081728991",
+12
+"paymentMode": "UPI",
+13
+"paymentAccountInfo": "9999999999@ybl"
+14 }
+
+Sample Request (Encrypted)
+1 {
+2
+"encryptedSessionKey":
+"az/eF0sHxpa6mRVWJq0+/tlE92pOVi75YZtZVHmp2E19ijyzNVUVcBn1xWswyxp5aOrSfi
+quPV+a6TjPJHaTUVJtp83uVI8poAAfphdZj+wukmbNz/ej7v4dPsMy1W3n+RHg/kDq+FqHC
+oqF0lIlnFP8aaIcDkVq2bqGsrnHrQcJFlzoVp/MEsj9Zl96WBx26vnCCOjmPQuocAqIm3CG
+AtaelU89d4V3ebfDSG9R+ofadFqeLe8jY8HGYOYv0dxhWviY4QdB4lT3V05wIr2RiewEi1f
+UHBE8Bpkk6s8GvEH4Rw/7oZ0yYztCaK1EEly+8Bwj85AYAtS83wGc1pX9jg==",
+3
+"encryptedPayload":
+"Soq2h5Aw4lk7SnQpHWeP/hFDgBA9GNRwrUAUnLSDLwGW6/iBmjQoXQ3wulNeAtqa5/qm6l
+cqHB+7VbGhH67WXZDc26FD3VBTDxsWh4ym29gGC9lMj0B6mbOE8Y/Q90nThMDISzVlZkHAD
+VnsippvxvTWimK1a5sI5Zmbacg88yAunUTebZyC/yLoAz2O75wyiSGEhr1uM569weeBos83
+B7J71UG+eX52Kr0y2JCbiJZcagQJaGbXvEcpeKZOJkQpg3dKxqJIb2u8CDnPkmNWWNfJb6N
+3",
+4
+"iv": "TsN9z/2deTUE32Aa",
+5
+"keyVersion": "1.0"
+6 }
+
+Success Response
+1 {
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13 }
+14
+
+"success": true,
+"data": {
+"status": "SUCCESS",
+"txId": "223407623",
+"balance": 200000.0,
+"couponstatus": "null",
+"mobikwikstamp": "MBK766722936",
+"opRefNo": "null",
+"googleVoucherCode": "null",
+"discountprice": 10.0
+}
+
+Failure Response
+1 {
+2
+"success": false,
+3
+"message": {
+4
+"code": "500",
+5
+"text": "Sorry! The transaction couldn’t succeed"
+6
+}
+7 }
+
+Success Response (with Additional Parameters) :Note :- We will include additional parameters only if they are received from BBPS :1
+2 {
+3
+"success": true,
+4
+"data": [
+5
+{
+6
+"billAmount": "500.0",
+7
+"billnetamount": "500.0",
+8
+"minBillAmount": 500.0,
+9
+"acceptPayment": true,
+10
+"acceptPartPay": true,
+11
+"cellNumber": "XXXX",
+
+12
+"userName": "XXXXX",
+13
+"additionalDetails": {
+14
+"Tag Status": "Active",
+15
+"Fast Tag Balance": "205.0",
+16
+"Vehicle Model": "XXX",
+17
+"Maximum Permissible Recharge Amount": "10000.0",
+18
+"Minimum Amount for Top-up": "500.0"
+19
+}
+20
+}
+21
+]
+22 }
+23
+
+Few examples of bankCode
+Bank Name
+
+Bank Code
+
+ICICI BANK LTD
+
+ICIC
+
+HDFC BANK LTD
+
+HDFC
+
+STATE BANK OF INDIA
+
+SBIN
+
+NOTE :
+For UAT Purpose of successful view bill credit card:
+
+mobile : 7378926854
+last4 : 1864
+bankCode : BARB
+Sample response:
+1 {
+2
+3
+4
+5
+6
+7
+8
+9 }
+
+"success": true,
+"data": {
+"statementDate": "2026-01-05",
+"dueDate": "2026-01-17",
+"dueAmount": 2500.0,
+"minimumAmountDue": 100.0
+}
+
+For UAT Purpose of failure view bill credit card:
+
+mobile : 7378926854
+last4 : 1864
+bankCode : HDFC/UTIB
+
+Note: You can use the above mentioned details and you should get the below response:
+Sample response:
+1 {
+2
+3
+4
+5
+6
+7 }
+
+"success": false,
+"message": {
+"code": "500",
+"text": "Unable to get bill details from Biller"
+}
+
+Testing Acceptance Criteria :
+
+Need to share following data in doc file :1. Logs of Token Generation API for Success cases.(URL, Request and Response)
+2. Logs of Token Generation API for Failed cases.(URL, Request and Response)
+3. Logs of Balance Check API for Success cases. (URL, Request and Response)
+4. Logs of Balance Check API for Failed cases. (URL, Request and Response)
+5. Logs of Validation API for Success cases.(URL, Request and Response)
+6. Logs of Validation API for Failed cases.(URL, Request and Response)
+7. Logs of View Bill API for Success cases. (URL, Request and Response)
+8. Logs of View Bill API for Failed cases. (URL, Request and Response)
+9. Logs of Recharge API for Success cases. (URL, Request and Response)
+10. Logs of Recharge API for Failed cases. (URL, Request and Response)
+11. Logs of Recharge API for Pending cases. (URL, Request and Response)
+12. Logs of Transaction Status Check API for Success cases. (URL, Request and
+
+Response)
+13. Logs of Transaction Status Check API for Failed cases. (URL, Request and Response)
+14. Logs of Transaction Status Check API for Pending cases. (URL, Request and
+Response)
+15. How will you handle Pending Cases? Need a complete description of what you do and how
+you do in such cases.
+16. How will you handle Timeout Cases? Need a complete description of what you do and how
+you do in such cases.
+17. After what Interval of time you hit the Transaction Status Check API for
+Pending/Timeout Cases?
+
+18. How will you handle Token expiry Cases? Need a complete description of what you do and
+
+how you do in such cases.
+19. Logs for Credit card bill fetch API for Success cases. (URL, Request and
+Response)
+20. Logs for Credit card bill fetch API for Failed cases. (URL, Request and Response)
+21. Logs for Credit card bill payment API for Success cases. (URL, Request and
+Response)
+22. Logs for Credit card bill payment API for Pending cases. (URL, Request and
+Response)
+23. Logs for Credit card bill payment API for Failed cases. (URL, Request and
+Response)
+24. Logs of Transaction Status Check API for Credit card for Success cases. (URL,
+Request and Response)
+25. Logs of Transaction Status Check API for Credit card for Failed cases. (URL, Request
+and Response)
+26. Logs of Transaction Status Check API for Credit card for Pending cases. (URL,
+Request and Response)
+
+
