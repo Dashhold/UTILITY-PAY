@@ -35,11 +35,11 @@ export const BRAND_ASSETS = {
   /** Full horizontal lockup: B mnemonic + "Bharat Connect" wordmark. */
   logoLockup: "/app/brand/bharat-connect-logo.png",
   /** Standalone B mnemonic. Falls back to a crop of the lockup if absent. */
-  mnemonic: "/app/brand/bharat-connect-mnemonic.png",
+  mnemonic: "/app/brand/b-mnemonic.png",
   /** B-Assured trust mark, shown on payment success + receipts. */
   assured: "/app/brand/b-assured.png",
   /** Official sonic branding clip played on the payment success screen. */
-  successAudio: "/app/brand/bharat-connect-success.mp3",
+  successAudio: "/app/brand/sonic-branding.mp3",
 } as const
 
 /**

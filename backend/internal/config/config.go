@@ -146,6 +146,11 @@ type BharatConnectConfig struct {
 	// an existing token out after 5 minutes when a new one is requested, so we
 	// refresh proactively rather than on failure.
 	TokenSafetyWindow time.Duration
+
+	// UATLogging enables detailed audit logs showing BOTH encrypted AND decrypted
+	// request/response pairs. Required for UAT submission but MUST be disabled in
+	// production (exposes session keys and plaintext payloads in logs).
+	UATLogging bool
 }
 
 // ReconciliationConfig controls the pending/timeout transaction status poller.
@@ -231,6 +236,7 @@ func Load() (*Config, error) {
 			Timeout:           envDuration("BC_TIMEOUT", 45*time.Second),
 			Enabled:           envBool("BC_ENABLED", true),
 			TokenSafetyWindow: envDuration("BC_TOKEN_SAFETY_WINDOW", 30*time.Minute),
+			UATLogging:        envBool("BC_UAT_LOGGING", false),
 		},
 		Reconciliation: ReconciliationConfig{
 			Enabled:     envBool("RECON_ENABLED", true),
@@ -375,6 +381,13 @@ func (c *Config) Warnings() []string {
 		out = append(out,
 			"APP_ENV is not 'production': stack traces are more verbose and TLS checks on the "+
 				"database are relaxed.")
+	}
+
+	if c.BharatConnect.UATLogging {
+		out = append(out,
+			"BC_UAT_LOGGING is enabled: detailed logs will include BOTH encrypted AND decrypted "+
+				"payloads (session keys, plaintext JSON). This is REQUIRED for UAT submission but "+
+				"MUST be disabled (BC_UAT_LOGGING=false) in production as it exposes sensitive data.")
 	}
 
 	return out

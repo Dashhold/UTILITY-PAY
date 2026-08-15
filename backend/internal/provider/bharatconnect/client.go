@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -39,12 +40,13 @@ var ErrInvalidRequest = errors.New("bharatconnect: invalid request")
 
 // Client talks to the MobiKwik Recharge & Bill Payment API.
 type Client struct {
-	cfg    config.BharatConnectConfig
-	http   *provider.Client
-	sealer *cryptoenv.Sealer
-	tokens *tokenManager
-	paths  endpointPaths
-	sealed map[string]bool
+	cfg       config.BharatConnectConfig
+	http      *provider.Client
+	sealer    *cryptoenv.Sealer
+	tokens    *tokenManager
+	paths     endpointPaths
+	sealed    map[string]bool
+	uatLogger *slog.Logger
 }
 
 // New builds a Client. The sealer is constructed eagerly so a malformed public
@@ -69,6 +71,13 @@ func New(cfg config.BharatConnectConfig, store TokenStore, sink provider.AuditSi
 		store = &MemoryTokenStore{}
 	}
 	c.tokens = newTokenManager(store, c.issueToken, cfg.TokenSafetyWindow)
+
+	// UAT logging: captures BOTH encrypted AND decrypted payloads for UAT evidence.
+	// MUST be disabled in production (exposes session keys + plaintext in logs).
+	if cfg.UATLogging {
+		c.uatLogger = slog.Default().With(slog.String("component", "bharatconnect_uat"))
+		c.uatLogger.Warn("UAT logging enabled: encrypted+decrypted payloads will be logged. DISABLE in production.")
+	}
 
 	return c, nil
 }
@@ -131,6 +140,17 @@ func (c *Client) issueToken(ctx context.Context) (string, time.Time, time.Time, 
 		return "", time.Time{}, time.Time{}, fmt.Errorf("bharatconnect: marshal token request: %w", err)
 	}
 
+	// UAT logging: token request (plaintext, redact secret for safety)
+	if c.uatLogger != nil {
+		c.uatLogger.Info("UAT TOKEN REQUEST",
+			slog.String("operation", OpToken),
+			slog.String("url", c.endpoint(c.paths.token)),
+			slog.String("clientId", c.cfg.ClientID),
+			slog.String("clientSecret", "[REDACTED]"),
+			slog.String("requestBody", redact(string(payload), c.cfg.ClientSecret)),
+		)
+	}
+
 	resp, err := c.http.Do(ctx, provider.Request{
 		Method:    http.MethodPost,
 		URL:       c.endpoint(c.paths.token),
@@ -142,7 +162,23 @@ func (c *Client) issueToken(ctx context.Context) (string, time.Time, time.Time, 
 		RequestPlaintext: redact(string(payload), c.cfg.ClientSecret),
 	})
 	if err != nil {
+		// UAT logging: token request failure
+		if c.uatLogger != nil {
+			c.uatLogger.Info("UAT TOKEN RESPONSE FAILURE",
+				slog.String("operation", OpToken),
+				slog.String("error", err.Error()),
+			)
+		}
 		return "", time.Time{}, time.Time{}, err
+	}
+
+	// UAT logging: token response
+	if c.uatLogger != nil {
+		c.uatLogger.Info("UAT TOKEN RESPONSE SUCCESS",
+			slog.String("operation", OpToken),
+			slog.Int("statusCode", resp.StatusCode),
+			slog.String("responseBody", string(resp.Body)),
+		)
 	}
 
 	var parsed tokenEnvelope
@@ -1011,6 +1047,24 @@ func (c *Client) callOnce(ctx context.Context, spec callSpec) (*rawResponse, err
 		req.KeyVersion = trace.Envelope.KeyVersion
 		req.IV = trace.Envelope.IV
 		req.SessionKeyBase64 = trace.SessionKeyBase64
+
+		// UAT logging: capture both encrypted envelope AND decrypted payload
+		if c.uatLogger != nil {
+			c.uatLogger.Info("UAT REQUEST",
+				slog.String("operation", spec.operation),
+				slog.String("url", c.endpoint(spec.path)),
+				slog.Group("encrypted",
+					slog.String("encryptedSessionKey", trace.Envelope.EncryptedSessionKey),
+					slog.String("encryptedPayload", trace.Envelope.EncryptedPayload),
+					slog.String("keyVersion", trace.Envelope.KeyVersion),
+					slog.String("iv", trace.Envelope.IV),
+				),
+				slog.Group("decrypted",
+					slog.String("sessionKey", trace.SessionKeyBase64),
+					slog.String("payload", string(trace.PlaintextPayload)),
+				),
+			)
+		}
 	} else {
 		req.Body = spec.payload
 	}
@@ -1022,6 +1076,15 @@ func (c *Client) callOnce(ctx context.Context, spec callSpec) (*rawResponse, err
 			out.statusCode = resp.StatusCode
 			out.outcome = resp.Outcome
 		}
+		// UAT logging: capture failures
+		if c.uatLogger != nil {
+			c.uatLogger.Info("UAT RESPONSE FAILURE",
+				slog.String("operation", spec.operation),
+				slog.Int("statusCode", out.statusCode),
+				slog.String("outcome", string(out.outcome)),
+				slog.String("error", err.Error()),
+			)
+		}
 		return out, err
 	}
 
@@ -1029,6 +1092,16 @@ func (c *Client) callOnce(ctx context.Context, spec callSpec) (*rawResponse, err
 		body:       resp.Body,
 		statusCode: resp.StatusCode,
 		outcome:    resp.Outcome,
+	}
+
+	// UAT logging: capture response (always plaintext from provider)
+	if c.uatLogger != nil {
+		c.uatLogger.Info("UAT RESPONSE SUCCESS",
+			slog.String("operation", spec.operation),
+			slog.Int("statusCode", out.statusCode),
+			slog.String("outcome", string(out.outcome)),
+			slog.String("responseBody", string(out.body)),
+		)
 	}
 
 	if resp.Outcome == provider.OutcomeAuthExpired {
