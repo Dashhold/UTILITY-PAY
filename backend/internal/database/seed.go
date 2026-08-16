@@ -509,10 +509,13 @@ func seedCompanyBanks(db *gorm.DB, _ *slog.Logger) error {
 // - "249" = Gas (Indane)
 //
 // UAT Test Connection Numbers (from documentation):
-// - Failed payment test: cn="7797833489", op="19"
-// - Pending payment test: cn="9459738434", op="3"
-// - Credit card success: mobile="7378926854", last4="1864", bankCode="BARB"
-// - Credit card failure: mobile="7378926854", last4="1864", bankCode="HDFC"
+// - Failed payment test: cn="7797833489", op="19", amt="200"
+// - Pending payment test: cn="9459738434", op="3", amt="200"
+// - Credit card SUCCESS: mobile="7378926854", last4="1864", bankCode="BARB" (Bank of Baroda)
+// - Credit card FAILURE: mobile="7378926854", last4="1864", bankCode="HDFC" or "UTIB"
+//
+// Note: The failed/pending test numbers are for operator IDs 19 and 3 which are NOT
+// in the UAT biller list. These are for API error handling tests only.
 //
 // The live list is refreshed from the provider; these entries exist so the bill
 // payment UI is navigable before the first sync.
@@ -564,6 +567,18 @@ func seedBillers(db *gorm.DB, _ *slog.Logger) error {
 			CustomerParams:    models.JSONMap{"Customer ID": map[string]any{"type": "alphanumeric", "minLength": 6, "maxLength": 20}},
 			SupportsBillFetch: true,
 			MinAmount:         decimal.NewFromInt(1), MaxAmount: decimal.NewFromInt(50000),
+			Status: models.StatusActive,
+		},
+		{
+			BillerID: "CCBILL000NAT01", OperatorID: "208", Name: "Credit Card Bill Payment",
+			Category: "Credit Card", Coverage: "National",
+			CustomerParams: models.JSONMap{
+				"Last 4 Digits": map[string]any{"type": "numeric", "minLength": 4, "maxLength": 4},
+				"Mobile Number": map[string]any{"type": "numeric", "minLength": 10, "maxLength": 10},
+				"Bank Code":     map[string]any{"type": "text", "minLength": 3, "maxLength": 10},
+			},
+			SupportsBillFetch: true,
+			MinAmount:         decimal.NewFromInt(100), MaxAmount: decimal.NewFromInt(100000),
 			Status: models.StatusActive,
 		},
 	}

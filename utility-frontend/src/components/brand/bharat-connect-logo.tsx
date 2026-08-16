@@ -17,17 +17,17 @@ type LogoSize = "xs" | "sm" | "md" | "lg" | "xl"
 const LOCKUP_HEIGHT: Record<LogoSize, number> = {
   xs: 16,
   sm: 20,
-  md: 26,
-  lg: 34,
-  xl: 48,
+  md: 34,
+  lg: 42,
+  xl: 56,
 }
 
 const MNEMONIC_HEIGHT: Record<LogoSize, number> = {
   xs: 20,
   sm: 28,
-  md: 40,
-  lg: 56,
-  xl: 84,
+  md: 52,
+  lg: 64,
+  xl: 92,
 }
 
 /**

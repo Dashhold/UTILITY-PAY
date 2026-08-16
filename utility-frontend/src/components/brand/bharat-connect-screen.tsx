@@ -58,7 +58,7 @@ export function BharatConnectScreen({
         {showBrandMark && (
           <div className="flex shrink-0 items-start gap-4 self-start">
             {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
-            <BharatConnectBrandBar label={brandLabel} />
+            <BharatConnectBrandBar label={brandLabel} size="sm" />
           </div>
         )}
         {!showBrandMark && actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

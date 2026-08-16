@@ -27,8 +27,8 @@ export function BharatConnectBillers() {
 
   const category = LIVE_CATEGORIES.find((c) => c.slug === categorySlug)
 
-  // Fetch billers from API
-  const { billers: allBillers } = useBillers(category?.name, query.trim().length >= 2 ? query : undefined)
+  // Fetch billers from API (fetch all for this category, filter on client)
+  const { billers: allBillers } = useBillers(category?.name)
 
   // Filter billers by category if not already filtered by API
   const all = React.useMemo(() => 
@@ -36,10 +36,16 @@ export function BharatConnectBillers() {
     [allBillers, categorySlug]
   )
 
-  const results = React.useMemo(() => 
-    query.trim().length >= 2 ? all : [],
-    [query, all]
-  )
+  const results = React.useMemo(() => {
+    const searchQuery = query.trim()
+    if (searchQuery.length === 0) return all
+    if (searchQuery.length < 2) return []
+    return all.filter(b => 
+      b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      b.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      b.coverage?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  }, [query, all])
 
   const popular = React.useMemo(() => 
     all.filter((b) => b.popular).slice(0, 10),

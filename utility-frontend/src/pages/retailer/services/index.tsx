@@ -44,7 +44,13 @@ export function ServicesPage() {
       to: "/retailer/bharat-connect",
       title: "Bharat Connect",
       description: "Fetch and pay electricity, gas, water, broadband and other utility bills",
-      icon: Receipt,
+      icon: () => (
+        <img 
+          src="/b-mnemonic-reverse.png" 
+          alt="Bharat Connect" 
+          className="size-5"
+        />
+      ),
       available: Boolean(capabilities?.bharatConnect.viewBill && capabilities?.bharatConnect.payment),
       unavailableNote: "Bill payment is not enabled for this account yet.",
     },
