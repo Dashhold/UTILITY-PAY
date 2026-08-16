@@ -104,9 +104,9 @@ export function Sidebar({ items, brandLabel, mobileOpen, onCloseMobile }: Sideba
     <div className="sidebar-shell flex h-full flex-col bg-black">
       <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-gray-800 px-4">
         <div className="flex items-center gap-2">
-          <img src="/utili-logo.jpeg" alt="UtilityPay" className="size-8 rounded-md object-cover" />
+          <img src="/utili-logo.jpeg" alt="UtiliPayHub" className="size-8 rounded-md object-cover" />
           <div className="flex flex-col leading-none">
-            <span className="text-sm font-semibold" style={{ color: COLOR_WHITE }}>UtilityPay</span>
+            <span className="text-sm font-semibold" style={{ color: COLOR_WHITE }}>UtiliPayHub</span>
             <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500">{brandLabel}</span>
           </div>
         </div>

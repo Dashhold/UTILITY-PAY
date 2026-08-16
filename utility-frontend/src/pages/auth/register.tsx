@@ -91,8 +91,8 @@ export function RegisterPage() {
       {/* Left brand panel */}
       <div className="relative hidden w-1/2 flex-col justify-between bg-black p-10 text-white lg:flex">
         <div className="flex items-center gap-2.5">
-          <img src="/utili-logo.jpeg" alt="UtilityPay" className="size-9 rounded-md object-cover" />
-          <span className="text-lg font-semibold">UtilityPay</span>
+          <img src="/utili-logo.jpeg" alt="UtiliPayHub" className="size-9 rounded-md object-cover" />
+          <span className="text-lg font-semibold">UtiliPayHub</span>
         </div>
 
         <div className="max-w-md">
@@ -118,15 +118,15 @@ export function RegisterPage() {
           </div>
         </div>
 
-        <p className="text-xs text-gray-500">© 2026 UtilityPay Pvt Ltd. All rights reserved.</p>
+        <p className="text-xs text-gray-500">© 2026 UtiliPayHub Pvt Ltd. All rights reserved.</p>
       </div>
 
       {/* Right form panel */}
       <div className="flex w-full flex-col items-center justify-center bg-white px-6 py-12 lg:w-1/2">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <img src="/utili-logo.jpeg" alt="UtilityPay" className="size-9 rounded-md object-cover" />
-            <span className="text-lg font-semibold text-gray-900">UtilityPay</span>
+            <img src="/utili-logo.jpeg" alt="UtiliPayHub" className="size-9 rounded-md object-cover" />
+            <span className="text-lg font-semibold text-gray-900">UtiliPayHub</span>
           </div>
 
           <div className="flex items-center gap-2">
