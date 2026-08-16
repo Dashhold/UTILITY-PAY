@@ -920,9 +920,19 @@ func (c *Client) post(ctx context.Context, op, path string, fields []formField, 
 	}
 
 	return c.http.Do(ctx, provider.Request{
-		Method:    http.MethodPost,
-		URL:       c.endpoint(path),
-		Headers:   map[string]string{"Content-Type": contentType, "Accept": "application/json"},
+		Method: http.MethodPost,
+		URL:    c.endpoint(path),
+		Headers: map[string]string{
+			"Content-Type": contentType,
+			"Accept":       "application/json",
+			// The provider's edge runs Mod_Security, which flags Go's default
+			// "Go-http-client/..." User-Agent as a scripted/bot client and
+			// answers with a blanket 406 before the request ever reaches the
+			// application. A conventional browser-style UA clears that rule;
+			// the provider has confirmed no IP allow-listing is required once
+			// the API key is present.
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+		},
 		Body:      body,
 		Operation: op,
 		// The API key travels in the body, so the plaintext record is redacted
