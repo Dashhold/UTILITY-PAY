@@ -1,0 +1,23 @@
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates tzdata wget \
+    && addgroup -S app && adduser -S -G app app
+
+WORKDIR /app
+
+# Copy the precompiled binary
+COPY api.linux /app/api
+RUN chmod +x /app/api
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+USER app
+EXPOSE 8080
+
+HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=20s \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:8080/health || exit 1
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["/app/api"]
