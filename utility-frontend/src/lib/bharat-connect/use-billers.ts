@@ -2,11 +2,13 @@ import * as React from "react"
 import { api } from "@/lib/api"
 import type { Biller as ApiBiller } from "@/lib/api-types"
 import type { Biller, BillerParam } from "./types"
+import { _updateBillerCache } from "./billers"
 
 /**
  * Hook to fetch billers from the backend API.
  * 
  * Converts API biller format to the UI format expected by the Bharat Connect screens.
+ * Also updates the global biller cache used by findBiller() and other utility functions.
  */
 export function useBillers(category?: string, search?: string) {
   const [billers, setBillers] = React.useState<Biller[]>([])
@@ -27,6 +29,12 @@ export function useBillers(category?: string, search?: string) {
         // Convert API billers to UI format
         const converted = data.map(apiToUiBiller)
         setBillers(converted)
+        
+        // Update global cache for utility functions like findBiller()
+        if (!category && !search) {
+          // Only update cache with unfiltered results
+          _updateBillerCache(converted)
+        }
       } catch (err) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : "Failed to load billers")
@@ -74,7 +82,7 @@ function apiToUiBiller(api: ApiBiller): Biller {
     categorySlug,
     coverage: api.coverage || "National",
     fetchRequirement: api.supportsBillFetch ? "MANDATORY" : "NOT_SUPPORTED",
-    amountExactness: api.partialPayAllowed ? "Approximate" : "Exact",
+    amountExactness: api.partialPayAllowed ? "Exact and above" : "Exact",
     supportsAdhoc: !api.supportsBillFetch,
     supportsPartPay: api.partialPayAllowed,
     ccf: { type: "flat", value: 0 }, // CCF is calculated server-side, no need to show separately

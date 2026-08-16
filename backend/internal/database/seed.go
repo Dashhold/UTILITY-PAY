@@ -492,6 +492,27 @@ func seedCompanyBanks(db *gorm.DB, _ *slog.Logger) error {
 }
 
 // seedBillers loads a starter Bharat Connect biller set.
+// seedBillers inserts a minimal set of UAT test billers if the table is empty.
+//
+// IMPORTANT: These are ONLY for UAT certification testing, not production use.
+//
+// After UAT approval, MobiKwik will provide a complete operator master file with
+// all production billers, additional params, paymodes, and regex validation rules.
+//
+// Reference: RT-Recharge API Documentation (page 8/33):
+// "For production system a separate Operator file with all details for additional
+// params, paymodes, regex would be shared after UAT sign off"
+//
+// Current UAT test billers use operator IDs from the documentation:
+// - "31" = Electricity billers (Punjab, Maharashtra)
+// - "7"  = Mobile/Broadband (Airtel, Jio)
+// - "249" = Gas (Indane)
+//
+// UAT Test Connection Numbers (from documentation):
+// - Failed payment test: cn="7797833489", op="19"
+// - Pending payment test: cn="9459738434", op="3"
+// - Credit card success: mobile="7378926854", last4="1864", bankCode="BARB"
+// - Credit card failure: mobile="7378926854", last4="1864", bankCode="HDFC"
 //
 // The live list is refreshed from the provider; these entries exist so the bill
 // payment UI is navigable before the first sync.

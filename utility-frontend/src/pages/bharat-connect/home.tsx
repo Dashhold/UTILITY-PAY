@@ -11,7 +11,8 @@ import {
 } from "@/components/brand/bharat-connect-logo"
 import { CategoryIcon } from "@/components/brand/category-icon"
 import { BHARAT_CONNECT, BRAND_COLORS, LIVE_CATEGORIES } from "@/lib/brand"
-import { LIVE_BILLERS, popularBillers, searchBillers } from "@/lib/bharat-connect/billers"
+import { popularBillers, searchBillers } from "@/lib/bharat-connect/billers"
+import { useBillers } from "@/lib/bharat-connect/use-billers"
 import { useBharatConnectFlow } from "@/lib/bharat-connect/flow-context"
 import { cn } from "@/lib/utils"
 
@@ -25,6 +26,9 @@ export function BharatConnectHome() {
   const navigate = useNavigate()
   const { selectCategory, selectBiller } = useBharatConnectFlow()
   const [query, setQuery] = React.useState("")
+  
+  // Load all billers from API to populate cache
+  const { billers, loading } = useBillers()
 
   const matches = React.useMemo(
     () => (query.trim().length < 2 ? [] : searchBillers(query).slice(0, 6)),
@@ -69,7 +73,7 @@ export function BharatConnectHome() {
 
           <div className="min-w-0 flex-1">
             <Badge variant="info" dot className="mb-3">
-              {LIVE_CATEGORIES.length} categories live &middot; {LIVE_BILLERS.length} billers
+              {LIVE_CATEGORIES.length} categories live &middot; {loading ? "..." : billers.length} billers
             </Badge>
             <h1 id="bc-hero-title" className="text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl">
               Pay any bill with {BHARAT_CONNECT.name}
@@ -165,7 +169,7 @@ export function BharatConnectHome() {
               </span>
               <span className="block text-sm font-medium leading-tight text-gray-900">{cat.name}</span>
               <span className="block text-[11px] leading-snug text-gray-500">
-                {LIVE_BILLERS.filter((b) => b.categorySlug === cat.slug).length} billers
+                {billers.filter((b) => b.categorySlug === cat.slug).length} billers
               </span>
             </button>
           ))}

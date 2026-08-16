@@ -7,7 +7,8 @@ import { EmptyState } from "@/components/shared/empty-state"
 import { BharatConnectScreen, JourneyStepper } from "@/components/brand/bharat-connect-screen"
 import { CategoryIcon } from "@/components/brand/category-icon"
 import { BRAND_COLORS, LIVE_CATEGORIES } from "@/lib/brand"
-import { LIVE_BILLERS } from "@/lib/bharat-connect/billers"
+import { billersByCategory } from "@/lib/bharat-connect/billers"
+import { useBillers } from "@/lib/bharat-connect/use-billers"
 import { useBharatConnectFlow } from "@/lib/bharat-connect/flow-context"
 
 /**
@@ -19,6 +20,9 @@ export function BharatConnectCategories() {
   const navigate = useNavigate()
   const { selectCategory } = useBharatConnectFlow()
   const [query, setQuery] = React.useState("")
+  
+  // Load all billers to populate cache (billersByCategory reads from cache)
+  useBillers()
 
   const categories = React.useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -57,7 +61,7 @@ export function BharatConnectCategories() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {categories.map((cat) => {
-            const count = LIVE_BILLERS.filter((b) => b.categorySlug === cat.slug).length
+            const count = billersByCategory(cat.slug).length
             return (
               <button
                 key={cat.slug}

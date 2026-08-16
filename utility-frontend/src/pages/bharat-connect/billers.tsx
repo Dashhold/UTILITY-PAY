@@ -28,7 +28,7 @@ export function BharatConnectBillers() {
   const category = LIVE_CATEGORIES.find((c) => c.slug === categorySlug)
 
   // Fetch billers from API
-  const { billers: allBillers, loading } = useBillers(category?.name, query.trim().length >= 2 ? query : undefined)
+  const { billers: allBillers } = useBillers(category?.name, query.trim().length >= 2 ? query : undefined)
 
   // Filter billers by category if not already filtered by API
   const all = React.useMemo(() => 
