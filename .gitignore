@@ -19,7 +19,13 @@
 # readable form as bharat_connect/recharge&billpayment_api_doc.md and
 # bharat_connect/pdf_poppler.txt, both with credentials removed, so nothing is
 # lost by keeping the original local.
-bharat_connect/*.pdf
+#
+# Documentation folders: These contain reference materials, media kits, logos,
+# and API documentation that should be kept locally but never deployed. They
+# add ~70MB to the repository and are not needed for building or running the
+# application.
+bharat_connect/
+AEPS/
 
 # Private keys and certificates, wherever they land.
 *.pem
