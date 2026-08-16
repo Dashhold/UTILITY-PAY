@@ -13,21 +13,29 @@ const ALT_MNEMONIC = `${BHARAT_CONNECT.name} B mnemonic`
 
 type LogoSize = "xs" | "sm" | "md" | "lg" | "xl"
 
-/** Rendered height of the trimmed artwork, in px, per size token. */
+/**
+ * Rendered height of the trimmed artwork, in px, per size token.
+ *
+ * `sm` is 20% larger than its base value rather than the general 10%: it is the
+ * only token used by `BharatConnectBrandBar`, the "Powered by" mark mandated in
+ * the top-right of every Bharat Connect screen, which was asked to grow more
+ * than the standalone logo elsewhere.
+ */
 const LOCKUP_HEIGHT: Record<LogoSize, number> = {
-  xs: 16,
-  sm: 20,
-  md: 34,
-  lg: 42,
-  xl: 56,
+  xs: 18, // 16 + 10%
+  sm: 24, // 20 + 20%
+  md: 37, // 34 + 10%
+  lg: 46, // 42 + 10%
+  xl: 62, // 56 + 10%
 }
 
+/** +10%, matching the standalone Bharat Connect logo everywhere it is used. */
 const MNEMONIC_HEIGHT: Record<LogoSize, number> = {
-  xs: 20,
-  sm: 28,
-  md: 52,
-  lg: 64,
-  xl: 92,
+  xs: 22, // 20 + 10%
+  sm: 31, // 28 + 10%
+  md: 57, // 52 + 10%
+  lg: 70, // 64 + 10%
+  xl: 101, // 92 + 10%
 }
 
 /**
