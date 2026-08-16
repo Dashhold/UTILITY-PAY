@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
-import { Fingerprint, Receipt, ArrowRight, AlertTriangle } from "lucide-react"
+import { Fingerprint, ArrowRight, AlertTriangle } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { PageHeader } from "@/components/shared/page-header"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -13,7 +14,7 @@ interface ServiceTile {
   to: string
   title: string
   description: string
-  icon: typeof Fingerprint
+  icon: LucideIcon | React.ComponentType
   /** True when the upstream reports the operations this tile needs. */
   available: boolean
   unavailableNote: string
